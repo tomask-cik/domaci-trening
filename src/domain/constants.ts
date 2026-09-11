@@ -16,7 +16,7 @@ export const PAIN_SKIP_ABOVE = 5 // bolesť > 5/10 => vynechať cvik
 // --- Deload (PROGRAM.md 5, RESEARCH R11) ---
 export const DELOAD_EVERY_WEEKS = 7 // 6 týždňov práce + 1 ľahký
 export const DELOAD_SET_REDUCTION = 1 // 3 → 2 série
-export const DELOAD_MIN_SETS = 2
+export const DELOAD_MIN_SETS = 1 // „o sériu menej“ platí aj pre finišery (2 -> 1), nie iba pre hlavné cviky
 export const DELOAD_REP_REDUCTION = 2 // cieľ −2 opakovania
 export const EARLY_DELOAD_SIGNALS_NEEDED = 2 // 2 zo 4 znakov
 

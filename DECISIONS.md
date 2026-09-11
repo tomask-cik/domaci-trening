@@ -56,3 +56,27 @@ Každý bod: čo bolo nejasné, čo sme zvolili, prečo, a kde sa to dá zmeniť
 - Žiadny jedálniček ani zápis jedál po položkách (zadanie: „žiadne striktné jedálničky“). Voliteľný je len jeden denný údaj: priemerný odhad kalórií, ak ho chce používateľ zadať.
 - Žiadna synchronizácia do cloudu, žiadne účty. Záloha je export JSON.
 - Žiadne notifikácie na pozadí (PWA push vyžaduje server); mikropauzy sú pripomienka v appke + odporúčanie nastaviť si budík.
+
+## E. Self-review: čo sa pri kontrole oproti RESEARCH.md našlo a opravilo
+
+Po dokončení appky som prešiel program aj kód oproti RESEARCH.md. Toto sú nájdené rozpory a ich opravy. Každá je pokrytá testom, aby sa nevrátila.
+
+| # | Čo bolo zle | Proti čomu | Oprava | Test |
+|---|---|---|---|---|
+| E1 | **Ramená sa trénovali 1× týždenne.** Tlak nad hlavu bol len v tréningu B, takže v týždni A/B/A mali ramená 3 série a frekvenciu 1×. | R3: každá partia aspoň 2× týždenne | Obe šablóny prebudované na rovnaké vzory pohybu (8 cvikov). Každá partia má teraz frekvenciu 3× a 6–18 sérií, rovnako pri A/B/A aj B/A/B. | `tests/program.test.ts`: frekvencia ≥ 2 pre každú partiu pri oboch poradiach týždňa |
+| E2 | **Mobilitná rutina trvala 17 minút**, hoci zadanie aj PROGRAM.md hovorili 8–12 min. Pyramída 5-3-1 na tri cviky a dve strany je 45 výdrží. | zadanie; R8 (nad 10 min/partiu/týždeň už bez prínosu) | Pyramída 3-2-1, pauzy 2 s, kratšie strečingové pozície → 11:55 min. Verzia 5-3-1 je spomenutá ako progresia pre pokročilých. | `tests/program.test.ts`: rutina ≤ 12 min |
+| E3 | **Týždenné vyhodnotenie by po deloade znížilo kalórie.** V deloade sa je na udržiavacej úrovni, hmotnosť zámerne stojí – algoritmus by to čítal ako „chudne pomaly“ a ubral 150 kcal. | R10 + R11: deload je prestávka v deficite | `computeWeeklyReview` deload týždeň preskakuje. Appka v deloade zobrazuje udržiavací príjem namiesto deficitného cieľa. | `tests/review.test.ts`: deload týždeň bez zmeny, nasledujúci týždeň už normálne |
+| E4 | **Cieľ bielkovín klesal s chudnutím.** Čistá hmota sa počítala z aktuálnej hmotnosti a jednorazovo zadaného % tuku, takže pri 95 kg vyšlo o 16 g menej než pri 105 kg. | R2: bielkoviny sa viažu na čistú hmotu, ktorú sa snažíme zachovať | Čistá hmota sa počíta z hmotnosti, pri ktorej sa % tuku meralo (štartovacej). Cieľ zostáva stabilný. | `tests/protein.test.ts`: cieľ neklesá s referenčnou hmotnosťou |
+| E5 | **Návod k zhybom obsahoval výskok** („hore stolička/výskok“) – priamy rozpor so zákazom skokov. | zadanie; R12 (Achilova šľacha) | Text zmenený na výstup po stoličke, s vysvetlením prečo. | knižnica cvikov; v celej appke nie je cvik so skokom |
+| E6 | **Deload neubral objem finišerom.** Nosenie a stred tela majú 2 série a podlaha deloadu bola 2, takže zostali nezmenené. | R11: deload = nižší objem | Podlaha znížená na 1 sériu, takže „o sériu menej“ platí všade. | `tests/program.test.ts`: deload zníži objem každej partie |
+| E7 | **Kalorická podlaha mlčky blokovala adaptáciu.** Pri 105 kg je podlaha 2 200 kcal a cieľ 2 310, takže krok −150 sa orezal bez vysvetlenia. | R1: deficit nad ~500 kcal blokuje rast svalov | Podlaha zostáva (je to správne miesto), ale appka k nej dopĺňa radu pridať kroky namiesto ďalšieho rezania kalórií (R6). | `tests/calories.test.ts`: pri podlahe je v odôvodnení rada s krokmi |
+| E8 | **Zaokrúhľovanie kalórií nebolo symetrické.** −55 kcal sa zaokrúhlilo na −50, +55 na +60; navyše plávajúca čiarka dávala 54,999…, takže výsledok závisel od zaokrúhľovacej chyby. | determinizmus výpočtu | `round10` zaokrúhľuje symetricky od nuly a s epsilon. | `tests/calories.test.ts` |
+| E9 | **PROGRAM.md tvrdil objem, ktorý šablóny nedávali** („chrbát ~18, zadok ~12, ramená ~9“ – skutočnosť bola 15 / 12 / 3). | konzistentnosť dokumentov s kódom | Objem sa počíta z kódu (`weeklyVolume`), v PROGRAM.md je tabuľka so skutočnými číslami a test ju stráži. | `tests/program.test.ts` |
+
+### Čo som po kontrole nechal tak a prečo
+
+- **Chrbát má 18 sérií týždenne**, viac než pásmo 10–14 z R3. Sú to dva rôzne vzory (zhyby a veslovanie) a v prvých štádiách sú „série“ zhybov 20–40 s visy, ktoré unavia málo. Znižovať to by ubralo z nácviku zhybu, čo je explicitný cieľ.
+- **Menšie partie majú 9 sérií**, nie 10–14. V deficite je limitom regenerácia (R1, R11) a R3 zároveň ukazuje, že už oveľa menší objem udrží silu. Radšej menej sérií dobre odcvičených.
+- **Appka nesleduje kardio jednotky**, len kroky. Zadanie žiadalo zápis krokov; kardio je v PROGRAM.md ako inštrukcia. Pridanie ďalšieho zápisu by appku zaťažilo bez úžitku.
+- **Mikropauzy nemajú notifikácie na pozadí.** PWA bez servera to nedokáže; appka radí nastaviť budík v telefóne.
+- **Predný sklon panvy sa nikde „neopravuje“.** Appka o ňom nehovorí ako o chybe – R7 hovorí, že to nie je príčina bolesti a 85 % mužov bez ťažkostí ho má. Mobilita je zdôvodnená rozsahom pohybu a pohodlím, nie naprávaním.

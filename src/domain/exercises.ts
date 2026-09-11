@@ -8,10 +8,15 @@ export interface Stage {
   note: string
 }
 
+/** Partie pre kontrolu týždenného objemu (RESEARCH R3). `direct` = pracovná séria pre danú partiu. */
+export type MuscleGroup = 'chrbat' | 'hrudnik_triceps' | 'ramena' | 'kvadricepsy' | 'zadok_hamstringy' | 'lytka' | 'stred'
+
 export interface Exercise {
   id: string
   name: string
   muscles: string
+  /** Partie, pre ktoré je cvik priamou pracovnou sériou. */
+  groups?: MuscleGroup[]
   kind: ExerciseKind
   category: 'sila' | 'stred' | 'mobilita'
   perSide: boolean
@@ -39,6 +44,7 @@ export const EXERCISES: Exercise[] = [
     id: 'goblet_squat',
     name: 'Goblet drep',
     muscles: 'kvadricepsy, zadok, stred tela',
+    groups: ['kvadricepsy'],
     kind: 'load',
     category: 'sila',
     perSide: false,
@@ -56,6 +62,7 @@ export const EXERCISES: Exercise[] = [
     id: 'kb_rdl',
     name: 'Rumunský mŕtvy ťah s KB',
     muscles: 'hamstringy, zadok, extenzory chrbta',
+    groups: ['zadok_hamstringy'],
     kind: 'load',
     category: 'sila',
     perSide: false,
@@ -73,6 +80,7 @@ export const EXERCISES: Exercise[] = [
     id: 'kb_deadlift',
     name: 'Mŕtvy ťah s KB (sumo)',
     muscles: 'zadok, hamstringy, stred tela',
+    groups: ['zadok_hamstringy'],
     kind: 'load',
     category: 'sila',
     perSide: false,
@@ -90,6 +98,7 @@ export const EXERCISES: Exercise[] = [
     id: 'kb_row',
     name: 'Jednoručné veslovanie s KB',
     muscles: 'široký sval chrbta, zadné ramená, biceps',
+    groups: ['chrbat'],
     kind: 'load',
     category: 'sila',
     perSide: true,
@@ -107,6 +116,7 @@ export const EXERCISES: Exercise[] = [
     id: 'kb_press',
     name: 'Jednoručný tlak nad hlavu',
     muscles: 'ramená, triceps, stred tela',
+    groups: ['ramena'],
     kind: 'load',
     category: 'sila',
     perSide: true,
@@ -124,6 +134,7 @@ export const EXERCISES: Exercise[] = [
     id: 'kb_floor_press',
     name: 'Tlak z podlahy s KB',
     muscles: 'hrudník, triceps, predné ramená',
+    groups: ['hrudnik_triceps'],
     kind: 'load',
     category: 'sila',
     perSide: true,
@@ -141,6 +152,7 @@ export const EXERCISES: Exercise[] = [
     id: 'reverse_lunge',
     name: 'Spätný výpad s KB (goblet)',
     muscles: 'kvadricepsy, zadok, stabilita bokov',
+    groups: ['kvadricepsy', 'zadok_hamstringy'],
     kind: 'load',
     category: 'sila',
     perSide: true,
@@ -158,6 +170,7 @@ export const EXERCISES: Exercise[] = [
     id: 'step_up',
     name: 'Výstup na stoličku',
     muscles: 'kvadricepsy, zadok',
+    groups: ['kvadricepsy'],
     kind: 'load',
     category: 'sila',
     perSide: true,
@@ -175,6 +188,7 @@ export const EXERCISES: Exercise[] = [
     id: 'glute_bridge',
     name: 'Mostík / hip thrust s KB',
     muscles: 'zadok, hamstringy',
+    groups: ['zadok_hamstringy'],
     kind: 'load',
     category: 'sila',
     perSide: false,
@@ -192,6 +206,7 @@ export const EXERCISES: Exercise[] = [
     id: 'calf_raise_slow',
     name: 'Pomalé výpony',
     muscles: 'lýtka, Achilova šľacha',
+    groups: ['lytka'],
     kind: 'load',
     category: 'sila',
     perSide: false,
@@ -209,6 +224,7 @@ export const EXERCISES: Exercise[] = [
     id: 'suitcase_carry',
     name: 'Nosenie kufríka (suitcase carry)',
     muscles: 'bočný stred tela, úchop, ramená',
+    groups: ['stred'],
     kind: 'timed',
     category: 'stred',
     perSide: true,
@@ -225,6 +241,7 @@ export const EXERCISES: Exercise[] = [
     id: 'hollow_hold',
     name: 'Hollow hold / dead bug',
     muscles: 'predná stena trupu',
+    groups: ['stred'],
     kind: 'timed',
     category: 'stred',
     perSide: false,
@@ -240,13 +257,14 @@ export const EXERCISES: Exercise[] = [
     id: 'pullup_prog',
     name: 'Progresia zhybu',
     muscles: 'široký sval chrbta, biceps, lopatky',
+    groups: ['chrbat'],
     kind: 'stage',
     category: 'sila',
     perSide: false,
     key: true,
     stages: [
       { name: 'Pasívny + aktívny vis', unit: 'sec', lo: 20, hi: 40, note: 'Lopatky dole, ramená preč od uší.' },
-      { name: 'Negatívy (5 s dole)', unit: 'reps', lo: 3, hi: 6, note: 'Hore stolička/výskok, plný rozsah dole bez pádu.' },
+      { name: 'Negatívy (5 s dole)', unit: 'reps', lo: 3, hi: 6, note: 'Hore vystúp po stoličke (bez výskoku – Achilova šľacha), plný rozsah dole bez pádu.' },
       { name: 'Izometria hore + v strede', unit: 'sec', lo: 5, hi: 15, note: 'Brada nad tyčou / lakeť 90°, striedaj.' },
       { name: 'Zhyby s gumou (silná) / noha na stoličke', unit: 'reps', lo: 4, hi: 8, note: 'Čo najmenej pomoci.' },
       { name: 'Zhyby s gumou (slabá)', unit: 'reps', lo: 4, hi: 8, note: '' },
@@ -262,6 +280,7 @@ export const EXERCISES: Exercise[] = [
     id: 'dip_prog',
     name: 'Progresia dipov',
     muscles: 'hrudník, triceps, predné ramená',
+    groups: ['hrudnik_triceps'],
     kind: 'stage',
     category: 'sila',
     perSide: false,
@@ -284,6 +303,7 @@ export const EXERCISES: Exercise[] = [
     id: 'pushup_prog',
     name: 'Progresia kliku',
     muscles: 'hrudník, triceps, ramená, stred tela',
+    groups: ['hrudnik_triceps'],
     kind: 'stage',
     category: 'sila',
     perSide: false,

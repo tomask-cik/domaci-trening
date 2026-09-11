@@ -28,7 +28,7 @@ export default function More({ settings }: { settings: Settings }) {
   const current = movingAverage(points, today) ?? points[points.length - 1]?.weightKg ?? settings.startWeightKg
   const bmr = mifflinStJeor(settings.sex, current, settings.heightCm, settings.age)
   const tdee = tdeeEstimate(bmr, settings.activityFactor)
-  const protein = proteinTarget({ targetWeightKg: settings.targetWeightKg, currentWeightKg: current, bodyFatPct: settings.bodyFatPct })
+  const protein = proteinTarget({ targetWeightKg: settings.targetWeightKg, referenceWeightKg: settings.startWeightKg, bodyFatPct: settings.bodyFatPct })
   const calendar = weekCalendar(today, 10, settings)
   const shortSleep = days.filter((d) => d.date >= todayISO() && typeof d.sleepH === 'number' && d.sleepH < 6).length
   const earlyDeload = shouldSuggestEarlyDeload({ repsDroppedTwice: false, jointPain: false, shortSleepNights: shortSleep >= 3, highRpe: false })

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Banner, Button, Card, CardTitle, NumberField, Pill, Stat } from '../components/ui'
 import { saveDay, sessionFor, startWorkout } from '../db/actions'
+import { mifflinStJeor, tdeeEstimate } from '../domain/calories'
 import { BREAK_INTERVAL_MIN } from '../domain/constants'
 import { dayOfWeekSk, formatSk, weekIndex } from '../domain/dates'
 import { getExercise } from '../domain/exercises'
@@ -31,9 +32,12 @@ export default function Today({ settings }: { settings: Settings }) {
   const avg = movingAverage(points, today)
   const current = avg ?? points[points.length - 1]?.weightKg ?? settings.startWeightKg
   const phase = phaseFor(current, settings.startWeightKg, settings.targetWeightKg)
-  const protein = proteinTarget({ targetWeightKg: settings.targetWeightKg, currentWeightKg: current, bodyFatPct: settings.bodyFatPct })
+  const protein = proteinTarget({ targetWeightKg: settings.targetWeightKg, referenceWeightKg: settings.startWeightKg, bodyFatPct: settings.bodyFatPct })
   const plan = planForToday(settings, workouts, today)
   const session = sessionFor(settings, plan.template, plan.isDeload)
+  // V deloade sa je na udržiavacej úrovni (PROGRAM.md 5, RESEARCH R11).
+  const maintenance = tdeeEstimate(mifflinStJeor(settings.sex, current, settings.heightCm, settings.age), settings.activityFactor)
+  const dayTarget = plan.isDeload ? maintenance : settings.calorieTarget
   const stepGoal = stepGoalForWeek(weekIndex(today, settings.programStartDate), settings.stepsStart, settings.stepsGoal)
   const lastReview = reviews[reviews.length - 1]
   const toGo = Math.max(0, Math.round((current - settings.targetWeightKg) * 10) / 10)
@@ -53,7 +57,12 @@ export default function Today({ settings }: { settings: Settings }) {
         {plan.isDeload ? <Pill tone="warn">Deload</Pill> : <Pill tone="accent">{plan.doneThisWeek}/{settings.daysPerWeek} tréningy</Pill>}
       </header>
 
-      {plan.isDeload ? <Banner tone="warn">Deload týždeň: o sériu menej, rovnaké váhy, RPE do 7, príjem na udržiavacej úrovni. Progresia sa tento týždeň nevyhodnocuje.</Banner> : null}
+      {plan.isDeload ? (
+        <Banner tone="warn">
+          Deload týždeň: o sériu menej, rovnaké váhy, RPE do 7, príjem na udržiavacej úrovni ({kcal(maintenance)}). Progresia sa tento týždeň nevyhodnocuje a hmotnosť, ktorá nejde
+          dole, neovplyvní kalorický cieľ.
+        </Banner>
+      ) : null}
 
       <Card>
         <CardTitle right={<Pill>{plan.kind === 'rest' ? 'voľno' : `~${estimateMinutes(session)} min`}</Pill>}>Dnešný tréning</CardTitle>
@@ -93,7 +102,18 @@ export default function Today({ settings }: { settings: Settings }) {
       </Card>
 
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Kalorický cieľ" value={kcal(settings.calorieTarget)} sub={lastReview ? `${signed(lastReview.newTarget - lastReview.oldTarget, 0)} kcal po poslednom týždni` : 'prvý odhad'} />
+        <Stat
+          label={plan.isDeload ? 'Príjem dnes (deload)' : 'Kalorický cieľ'}
+          value={kcal(dayTarget)}
+          tone={plan.isDeload ? 'warn' : 'ink'}
+          sub={
+            plan.isDeload
+              ? `udržiavací príjem, deficit ${kcal(settings.calorieTarget)} sa vráti po deloade`
+              : lastReview
+                ? `${signed(lastReview.newTarget - lastReview.oldTarget, 0)} kcal po poslednom týždni`
+                : 'prvý odhad'
+          }
+        />
         <Stat label="Bielkoviny" value={`${protein.gramsPerDay} g`} sub={`${protein.perMeal} g × 4 jedlá`} />
       </div>
 

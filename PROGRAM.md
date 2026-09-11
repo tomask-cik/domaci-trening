@@ -33,7 +33,9 @@ Nasledujúci týždeň sa poradie otočí (B/A/B), aby každá partia mala v pri
 
 ### 1.2 Tréning A a B
 
-**Tréning A** (drep + vertikálny ťah, hinge + horizontálny tlak)
+Obe jednotky sú celotelové a pokrývajú **rovnaké vzory pohybu** (drep, hinge, vertikálny ťah, horizontálny ťah, tlak, tlak nad hlavu, lýtka, stred). Líšia sa variantom cviku. Dôvod je v R3: každá partia má mať frekvenciu aspoň 2× týždenne — a to musí platiť aj v týždni, ktorý vyjde B/A/B. Prvá verzia tohto programu mala tlak nad hlavu len v tréningu B, takže ramená vychádzali 1× týždenne; to je opravené (pozri DECISIONS E).
+
+**Tréning A** (drep, klik, veslovanie)
 
 | Dvojica | Cvik | Séria × opakovania | Štart (KB 12/16/24) | Pauza |
 |---|---|---|---|---|
@@ -42,24 +44,38 @@ Nasledujúci týždeň sa poradie otočí (B/A/B), aby každá partia mala v pri
 | 2a | Rumunský mŕtvy ťah s KB | 3 × 8–15 | 24 kg | 60 s |
 | 2b | Progresia kliku | 3 × 6–15 | – | 90 s |
 | 3a | Jednoručné veslovanie s KB | 3 × 8–15 / strana | 16 kg | 60 s |
-| 3b | Pomalé výpony (3 s hore / 3 s dole) | 3 × 8–15 | 16 kg | 60 s |
-| 4 | Nosenie kufríka (suitcase carry) | 2 × 30–45 s / strana | 24 kg | 60 s |
+| 3b | Jednoručný tlak nad hlavu | 3 × 6–12 / strana | 12 kg | 90 s |
+| 4a | Pomalé výpony (3 s hore / 3 s dole) | 3 × 8–15 | 16 kg | 60 s |
+| 4b | Nosenie kufríka (suitcase carry) | 2 × 30–45 s / strana | 24 kg | 60 s |
 
-**Tréning B** (hinge + horizontálny/vertikálny tlak, unilaterálne nohy + vertikálny ťah)
+**Tréning B** (mŕtvy ťah, dipy, výpady)
 
 | Dvojica | Cvik | Séria × opakovania | Štart | Pauza |
 |---|---|---|---|---|
 | 1a | Mŕtvy ťah s KB (sumo) → neskôr jednonožný RDL | 3 × 8–15 | 24 kg | 60 s |
-| 1b | Progresia dipov (štádium) | 3 × podľa štádia | – | 90 s |
+| 1b | Progresia zhybu (podhmat / neutrálny úchop) | 3 × podľa štádia | – | 90 s |
 | 2a | Spätný výpad s KB (goblet) | 3 × 6–12 / strana | 12 kg | 60 s |
-| 2b | Jednoručný tlak nad hlavu | 3 × 6–12 / strana | 12 kg | 90 s |
-| 3a | Progresia zhybu (variant B: izometria/chin-up) | 3 × podľa štádia | – | 90 s |
-| 3b | Pomalé výpony | 3 × 8–15 | 16 kg | 60 s |
-| 4 | Hollow hold / dead bug | 2 × 20–40 s | – | 60 s |
+| 2b | Progresia dipov (štádium) | 3 × podľa štádia | – | 90 s |
+| 3a | Jednoručné veslovanie s KB | 3 × 8–15 / strana | 16 kg | 60 s |
+| 3b | Jednoručný tlak nad hlavu | 3 × 6–12 / strana | 12 kg | 90 s |
+| 4a | Pomalé výpony | 3 × 8–15 | 16 kg | 60 s |
+| 4b | Hollow hold / dead bug | 2 × 20–40 s | – | 60 s |
 
-Týždenný objem pri A/B/A: chrbát ~18 sérií, kvadricepsy ~9 + nepriamo, zadok/hamstringy ~12, hrudník/triceps ~9–12, ramená ~9 + nepriamo, lýtka 9 → v cieľovom pásme 10–14 pre deficit (R3). Nič nad 20 sérií – v deficite je regenerácia limit (R1, R11).
+**Týždenný objem priamych pracovných sérií** (3 tréningy, 45 min; rovnaký pri A/B/A aj B/A/B — test v `tests/program.test.ts` to stráži):
 
-**Prispôsobenie času (appka to robí automaticky):** 30 min → vynechať dvojicu 3 a položku 4; 60 min → 4 série v dvojiciach 1 a 2. **2 dni/týždeň** → A a B striedavo (každá partia 1–1,5×/týž, prijateľné minimum podľa Androulakis-Korakakis 2020, R3). **4 dni** → A B A B.
+| Partia | Sérií/týždeň | Frekvencia |
+|---|---|---|
+| Chrbát (zhyby + veslovanie) | 18 | 3× |
+| Zadok a hamstringy | 12–15 | 3× |
+| Kvadricepsy | 9 | 3× |
+| Hrudník a triceps | 9 | 3× |
+| Ramená | 9 | 3× |
+| Lýtka (protokol pre Achilovu šľachu) | 9 | 3× |
+| Stred tela | 6 | 3× |
+
+K tomu ide nepriamy objem (kliky a dipy zaťažujú aj ramená, zhyby a veslovanie aj biceps, výpady aj zadok), takže efektívne čísla sú vyššie. Pásmo 10–14 z R3 je splnené pre veľké partie; menšie partie sú na 9, čo je v deficite zámerné — regenerácia, nie objem, je limit (R1, R11). Nič nejde nad 18 sérií.
+
+**Prispôsobenie času (appka to robí automaticky):** 30 min → zostanú len dvojice 1 a 2 (4 cviky, 12 sérií); 60 min → 4 série v dvojiciach 1 a 2. **2 dni/týždeň** → A a B striedavo; každá partia stále 2× týždenne, len s menším objemom (minimálna účinná dávka podľa Androulakis-Korakakis 2020, R3). **4 dni** → A B A B.
 
 ### 1.3 Pravidlá progresie (algoritmus)
 
@@ -192,7 +208,8 @@ Dôkazy: R11 (Coleman 2024 – deload každé 4 týždne nezlepšuje hypertrofiu
 
 - **Plánovaný: každý 7. týždeň** (6 týždňov práce + 1 ľahký). Appka ho zobrazuje v kalendári (DECISIONS A14).
 - **Skorší deload**, ak platia 2 z 4: (a) pokles opakovaní v 2 tréningoch za sebou pri rovnakej váhe, (b) bolesť kĺbov/šliach > 3/10, (c) spánok < 6 h viac než 3 noci, (d) RPE 9–10 pri bežných sériách. Tlačidlo „Spustiť deload teraz“.
-- **Obsah:** 2 série namiesto 3, rovnaké váhy, cieľ −2 opakovania, RPE ≤ 7; kardio 1×; mobilita bez zmeny; **príjem na udržiavacej úrovni** (R10 bod 6) – ľahký týždeň je zároveň prestávka v deficite.
+- **Obsah:** o sériu menej v každom cviku (3 → 2, finišery 2 → 1), rovnaké váhy, cieľ −2 opakovania, RPE ≤ 7; kardio 1×; mobilita bez zmeny; **príjem na udržiavacej úrovni** (R10 bod 6) – ľahký týždeň je zároveň prestávka v deficite.
+- **Dôsledok pre kalórie:** v deloade sa je na udržiavacej úrovni, takže hmotnosť zámerne nejde dole. Týždenné vyhodnotenie preto deload týždeň **preskakuje** – inak by appka znížila kalórie za správne dodržaný plán. Appka v deloade zobrazuje udržiavací príjem namiesto deficitného cieľa.
 - Po deloade sa progresie vyhodnocujú od prvého normálneho tréningu.
 
 ---

@@ -1,6 +1,7 @@
 import { adaptCalorieTarget, mifflinStJeor, tdeeEstimate } from './calories'
 import { MIN_DAYS_BEFORE_ADAPT, MIN_WEIGHINS_PER_WEEK, SLEEP_KCAL_BONUS, SLEEP_SHORT_HOURS, SLEEP_SHORT_NIGHTS } from './constants'
 import { addDays, diffDays, weekStart } from './dates'
+import { isDeloadWeek } from './deload'
 import type { DayLog, Settings, WeekReview } from './types'
 import { weeklyRate, type WeightPoint } from './weight'
 
@@ -41,6 +42,11 @@ export function computeWeeklyReview(settings: Settings, days: DayLog[], weekStar
   }
   if (diffDays(settings.programStartDate, weekEnd) + 1 < MIN_DAYS_BEFORE_ADAPT) {
     return { ...base, reason: `Prvé ${MIN_DAYS_BEFORE_ADAPT} dní sa cieľ nemení – zbierame dáta.` }
+  }
+  // V deloade sa je na udržiavacej úrovni (PROGRAM.md 5), takže hmotnosť zámerne nejde dole.
+  // Keby sme z toho počítali, cieľ by sme znížili za správne dodržaný plán.
+  if (isDeloadWeek(weekStartISO, settings)) {
+    return { ...base, reason: 'Deload / udržiavací týždeň – hmotnosť zámerne nejde dole, cieľ sa nemení.' }
   }
   if (rate.avgThis === null || rate.avgPrev === null || rate.rateKgPerWeek === null) {
     return { ...base, reason: `Málo vážení (treba aspoň ${MIN_WEIGHINS_PER_WEEK} v každom z dvoch týždňov) – cieľ bez zmeny.` }

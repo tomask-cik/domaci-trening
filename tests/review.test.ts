@@ -68,6 +68,18 @@ describe('computeWeeklyReview', () => {
     expect(r.newTarget).toBe(2460)
     expect(r.reason).toContain('Spánok')
   })
+  it('deload týždeň cieľ nemení (je sa na udržiavacej úrovni)', () => {
+    // 2026-10-19 je 7. týždeň cyklu => deload; hmotnosť stojí, ale kalórie sa nesmú znížiť
+    const d = [...days('2026-10-12', [100, 100, 100, 100, 100, 100, 100]), ...days('2026-10-19', [100, 100, 100, 100, 100, 100, 100])]
+    const r = computeWeeklyReview(settings, d, '2026-10-19', '2026-10-26')
+    expect(r.newTarget).toBe(settings.calorieTarget)
+    expect(r.reason).toContain('Deload')
+  })
+  it('týždeň po deloade sa už vyhodnocuje normálne', () => {
+    const d = [...days('2026-10-19', [100, 100, 100, 100, 100, 100, 100]), ...days('2026-10-26', [100, 100, 100, 100, 100, 100, 100])]
+    const r = computeWeeklyReview(settings, d, '2026-10-26', '2026-11-02')
+    expect(r.newTarget).toBeLessThan(settings.calorieTarget)
+  })
   it('so zapísaným príjmom sa výdaj počíta priamo', () => {
     const d = [...days('2026-09-07', [105, 105, 105, 105, 105, 105, 105]), ...days('2026-09-14', [104.5, 104.5, 104.5, 104.5, 104.5, 104.5, 104.5], { kcal: 2300 })]
     const r = computeWeeklyReview(settings, d, '2026-09-14', '2026-09-21')

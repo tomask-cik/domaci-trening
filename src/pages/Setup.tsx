@@ -27,7 +27,7 @@ export default function Setup() {
 
   const bmr = valid ? mifflinStJeor('m', weight, heightCm, age) : 0
   const startTarget = valid ? initialCalorieTarget(bmr) : 0
-  const protein = valid ? proteinTarget({ targetWeightKg: target, currentWeightKg: weight, bodyFatPct: bodyFat }) : null
+  const protein = valid ? proteinTarget({ targetWeightKg: target, referenceWeightKg: weight, bodyFatPct: bodyFat }) : null
 
   async function submit() {
     if (!valid || saving) return

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EXERCISES, EXERCISE_MAP } from '../src/domain/exercises'
-import { buildSession, estimateMinutes, nextTemplate, TEMPLATES } from '../src/domain/program'
+import { buildSession, estimateMinutes, nextTemplate, TEMPLATES, weeklyFrequency, weeklyVolume, weekOrder } from '../src/domain/program'
 import { expandRoutine, routineTotalSeconds } from '../src/domain/mobility'
 import { stepGoalForWeek, weeklySteps } from '../src/domain/steps'
 import { planForToday } from '../src/domain/plan'
@@ -20,30 +20,72 @@ describe('šablóny', () => {
       if (e.kind === 'stage') expect(e.stages?.length).toBeGreaterThan(2)
     }
   })
-  it('45 min: 7 cvikov po 3 série; deload 2 série', () => {
+  it('45 min: 8 cvikov, hlavné po 3 série, finišer 2; deload o sériu menej', () => {
     const s = buildSession('A', 45, false)
-    expect(s).toHaveLength(7)
-    expect(s.every((i) => i.sets === 3)).toBe(true)
-    expect(buildSession('A', 45, true).every((i) => i.sets === 2)).toBe(true)
+    expect(s).toHaveLength(8)
+    expect(s.filter((i) => i.exerciseId !== 'suitcase_carry').every((i) => i.sets === 3)).toBe(true)
+    expect(s.find((i) => i.exerciseId === 'suitcase_carry')?.sets).toBe(2)
+    const deload = buildSession('A', 45, true)
+    expect(deload.filter((i) => i.exerciseId !== 'suitcase_carry').every((i) => i.sets === 2)).toBe(true)
+    expect(deload.find((i) => i.exerciseId === 'suitcase_carry')?.sets).toBe(1)
   })
   it('30 min: vypadnú dvojice 3 a 4', () => {
     const s = buildSession('B', 30, false)
     expect(s.map((i) => i.pair)).toEqual([1, 1, 2, 2])
   })
-  it('60 min: 4 série v dvojiciach 1–2', () => {
+  it('60 min: 4 série v dvojiciach 1–2, finišer zostáva na 2', () => {
     const s = buildSession('A', 60, false)
     expect(s.filter((i) => i.pair <= 2).every((i) => i.sets === 4)).toBe(true)
-    expect(s.filter((i) => i.pair > 2).every((i) => i.sets === 3)).toBe(true)
+    expect(s.find((i) => i.exerciseId === 'suitcase_carry')?.sets).toBe(2)
   })
-  it('odhad trvania 45 min v rozumnom pásme', () => {
-    const m = estimateMinutes(buildSession('A', 45, false))
-    expect(m).toBeGreaterThan(35)
-    expect(m).toBeLessThan(60)
+  it('odhad trvania sedí s nastaveným časom', () => {
+    expect(estimateMinutes(buildSession('A', 30, false))).toBeLessThanOrEqual(35)
+    const m45 = estimateMinutes(buildSession('A', 45, false))
+    expect(m45).toBeGreaterThan(35)
+    expect(m45).toBeLessThanOrEqual(52)
+    expect(estimateMinutes(buildSession('A', 60, false))).toBeLessThanOrEqual(62)
   })
   it('striedanie A/B', () => {
     expect(nextTemplate(null)).toBe('A')
     expect(nextTemplate('A')).toBe('B')
     expect(nextTemplate('B')).toBe('A')
+  })
+})
+
+describe('týždenný objem a frekvencia (RESEARCH R3)', () => {
+  const GROUPS = ['chrbat', 'hrudnik_triceps', 'ramena', 'kvadricepsy', 'zadok_hamstringy', 'lytka', 'stred'] as const
+
+  it('každá partia sa trénuje aspoň 2× týždenne bez ohľadu na poradie A/B', () => {
+    for (const start of ['A', 'B'] as const) {
+      const freq = weeklyFrequency(weekOrder(3, start), 45)
+      for (const g of GROUPS) expect(freq[g], `${g} pri štarte ${start}`).toBeGreaterThanOrEqual(2)
+    }
+  })
+  it('objem na partiu je v pásme vhodnom pre deficit (6–18 priamych sérií)', () => {
+    for (const start of ['A', 'B'] as const) {
+      const vol = weeklyVolume(weekOrder(3, start), 45)
+      for (const g of GROUPS) {
+        expect(vol[g], `${g} pri štarte ${start}`).toBeGreaterThanOrEqual(6)
+        expect(vol[g], `${g} pri štarte ${start}`).toBeLessThanOrEqual(18)
+      }
+    }
+  })
+  it('poradie týždňa nemení frekvenciu žiadnej partie', () => {
+    const a = weeklyFrequency(weekOrder(3, 'A'), 45)
+    const b = weeklyFrequency(weekOrder(3, 'B'), 45)
+    expect(a).toEqual(b)
+  })
+  it('pri 2 dňoch v týždni je frekvencia aspoň 2× (minimálna dávka)', () => {
+    const freq = weeklyFrequency(weekOrder(2, 'A'), 45)
+    for (const g of GROUPS) expect(freq[g], g).toBeGreaterThanOrEqual(2)
+  })
+  it('deload uberie objem, nie frekvenciu', () => {
+    const normal = weeklyVolume(weekOrder(3, 'A'), 45, false)
+    const deload = weeklyVolume(weekOrder(3, 'A'), 45, true)
+    for (const g of GROUPS) expect(deload[g]).toBeLessThan(normal[g])
+  })
+  it('lýtka sa trénujú 3× týždenne (protokol pre Achilovu šľachu, R12)', () => {
+    expect(weeklyFrequency(weekOrder(3, 'A'), 45).lytka).toBe(3)
   })
 })
 
