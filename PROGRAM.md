@@ -6,13 +6,13 @@
 
 | Deň | Ráno (2 min) | Cez deň | Poobede/večer |
 |---|---|---|---|
-| Po | váženie, zápis | mikropauzy každých 30–45 min, kroky | **Silový tréning A** (45–50 min) + mobilita 10 min |
-| Ut | váženie | mikropauzy, kroky | kardio 20–35 min (bicykel/kopec/veslovanie) + mobilita 10 min |
+| Po | váženie, zápis | mikropauzy každých 30–45 min, kroky | **Silový tréning A** (45–50 min) + mobilita ~12 min |
+| Ut | váženie | mikropauzy, kroky | kardio 20–35 min (bicykel/kopec/veslovanie) + mobilita ~12 min |
 | St | váženie | mikropauzy, kroky | **Silový tréning B** + mobilita |
-| Št | váženie | mikropauzy, kroky | mobilita 10 min (voliteľne prechádzka navyše) |
+| Št | váženie | mikropauzy, kroky | mobilita ~12 min (voliteľne prechádzka navyše) |
 | Pi | váženie | mikropauzy, kroky | **Silový tréning A** + mobilita |
 | So | váženie | kroky (dlhšia prechádzka) | kardio 20–35 min + mobilita |
-| Ne | váženie, **týždenné vyhodnotenie** (appka) | kroky | mobilita 10 min, voľno |
+| Ne | váženie, **týždenné vyhodnotenie** (appka) | kroky | mobilita ~12 min, voľno |
 
 Nasledujúci týždeň sa poradie otočí (B/A/B), aby každá partia mala v priemere 2 jednotky týždenne (R3). Dni sa dajú presunúť; dôležité je 3× silový tréning s aspoň 1 dňom pauzy medzi nimi, 2× kardio, mobilita denne, kroky denne.
 
@@ -29,7 +29,7 @@ Nasledujúci týždeň sa poradie otočí (B/A/B), aby každá partia mala v pri
 1. **Rozcvička 5 min** (R8, Fradkin 2010; Behm 2016 – statický strečing ≤30 s): 10× cat-camel, 8× výpad vzad s rotáciou trupu, 10× drep bez záťaže, 10× kĺbové krúženie ramien, 10× „pull-apart“ s gumou, 1 ľahká séria prvého cviku.
 2. **Hlavná časť 35–40 min:** 6 cvikov v **dvojiciach (supersety antagonistov)** – cvik 1, pauza 60 s, cvik 2, pauza 60–90 s, opakovať 3×. Pauza medzi sériami toho istého cviku tak vychádza na 2–3 min (R4, Grgic 2018; Singer 2024 – nad 60 s).
 3. **Stred tela 3 min**, **výpony 3 min** (R12).
-4. Mobilitná rutina (časť 2) sa dá spraviť hneď po tréningu alebo večer.
+4. Mobilitná rutina (časť 2, ~12 min) sa dá spraviť hneď po tréningu alebo večer.
 
 ### 1.2 Tréning A a B
 
@@ -140,23 +140,25 @@ Rovnaké texty sú v appke (`src/domain/exercises.ts`). Všetky cviky sú bez sk
 
 ---
 
-## 2. Denná mobilitná rutina (10 min, zamerané na sedenie)
+## 2. Denná mobilitná rutina (~12 min, zamerané na sedenie)
 
-Dôvod a dávka: R8 (Konrad 2024 – strop 10 min/sval/týždeň, 30–60 s na pozíciu; Thomas 2018 – ≥5 dní/týždeň) a R9 (Big 3 – výdrž trupu, nízka kompresia). Nie je to „oprava“ držania tela (R7), je to rozsah pohybu pre cviky a pohodlie po sedení.
+Dôvod a dávka: R8 (Konrad 2024 – strop 10 min/sval/týždeň, nad 4 min na jednu jednotku už bez prínosu; Thomas 2018 – ≥5 min/sval/týždeň rozložených do ≥5 dní) a R9 (Big 3 – výdrž trupu pri nízkej kompresii chrbtice). Nie je to „oprava“ držania tela (R7), je to rozsah pohybu pre cviky a pohodlie po sedení.
 
-| # | Cvik | Dávka | Cieľ |
-|---|---|---|---|
-| 1 | Cat-camel (mačka–ťava) | 10 pomalých opakovaní | mobilita chrbtice, rozcvičenie |
-| 2 | Strečing flexorov bedier v polokľaku (zadok stiahnutý, panva „podsadená“) | 45 s / strana | predná strana bokov |
-| 3 | 90/90 prehadzovanie bokov | 60 s | vnútorná a vonkajšia rotácia bedra |
-| 4 | Strečing zadku „štvorka“ (figure-4) v sede/ľahu | 45 s / strana | zadok, hlboké rotátory |
-| 5 | Extenzia hrudnej chrbtice cez operadlo stoličky + „open book“ rotácie v ľahu na boku | 8 × extenzia, 8 × rotácia / strana | hrudná chrbtica |
-| 6 | Wall slides / pull-apart s gumou | 10 opakovaní | ramená, lopatky, horný chrbát |
-| 7 | **McGill curl-up** (jedna noha pokrčená, ruky pod driekom, dvíhať len hlavu a ramená 2–3 cm) | pyramída 5-3-1 × 10 s | predná stena trupu |
-| 8 | **Bočný most** (na kolenách → na chodidlách) | 5-3-1 × 10 s / strana | bočná stena trupu |
-| 9 | **Bird dog** (ruka + opačná noha, „zametanie“ späť) | 5-3-1 × 10 s / strana | extenzory chrbta, kontrola panvy |
+| # | Cvik | Dávka | Čas | Cieľ |
+|---|---|---|---|---|
+| 1 | Cat-camel (mačka–ťava) | 10 pomalých opakovaní | 35 s | mobilita chrbtice, rozcvičenie |
+| 2 | Strečing flexorov bedier v polokľaku (zadok stiahnutý, panva „podsadená“) | 45 s / strana | 90 s | predná strana bokov |
+| 3 | 90/90 prehadzovanie bokov | plynulo | 40 s | vnútorná a vonkajšia rotácia bedra |
+| 4 | Strečing zadku „štvorka“ (figure-4) v ľahu | 45 s / strana | 90 s | zadok, hlboké rotátory |
+| 5 | Extenzia hrudnej chrbtice cez operadlo + „open book“ rotácie na boku | 8 × extenzia, 8 × rotácia / strana | 70 s | hrudná chrbtica |
+| 6 | Wall slides / pull-apart s gumou | 10 opakovaní | 30 s | ramená, lopatky, horný chrbát |
+| 7 | **McGill curl-up** (jedna noha pokrčená, ruky pod driekom, dvíhať len hlavu a ramená 2–3 cm) | pyramída 3-2-1 × 10 s | 72 s | predná stena trupu |
+| 8 | **Bočný most** (na kolenách → na chodidlách) | 3-2-1 × 10 s / strana | 144 s | bočná stena trupu |
+| 9 | **Bird dog** (ruka + opačná noha, „zametanie“ späť) | 3-2-1 × 10 s / strana | 144 s | extenzory chrbta, kontrola panvy |
 
-Spolu ~10–11 min. Appka vedie sprievodcom s časovačom, pyramídy počíta. Pri bolesti pri cviku: vynechať, zaznamenať v appke.
+**Spolu 715 s ≈ 12 min** vrátane 2 s pauz medzi výdržami (appka to počíta presne, test to stráži). Strečingové pozície dávajú ~5 min na partiu za týždeň pri dennom cvičení – presne pásmo z R8; viac by už nič nepridalo.
+
+Pyramída 3-2-1 je štartovacia verzia. Kto zvládne všetky výdrže bez triašky, môže prejsť na McGillovu 5-3-1; rutina sa tým predĺži na ~17 min (appka to zatiaľ nemení automaticky). Pri bolesti pri cviku: vynechať a zaznamenať.
 
 ---
 
@@ -211,7 +213,7 @@ Fázy sa prepínajú podľa **7-dňového priemeru hmotnosti**, nie podľa dátu
 
 ## 7. Výživa – jednoduché pravidlá (bez jedálnička)
 
-- **Kalorický cieľ:** štart = Mifflin-St Jeor × 1,4 − 500 (pri 35 r., 180 cm, 105 kg ≈ 2 060 × 1,4 − 500 ≈ **2 390 kcal/deň**); potom **týždenná adaptácia** podľa trendu (R10): pomalšie než 0,5 %/týž → −100 až −150 kcal; rýchlejšie než 0,7 %/týž → +100 až +150 kcal; podlaha BMR × 1,1 (~2 270 kcal na začiatku, klesá s hmotnosťou). Číslo je orientačné; **trend hmotnosti je pravda**.
+- **Kalorický cieľ:** štart = Mifflin-St Jeor × 1,4 − 500. Pri 35 r., 180 cm, 105 kg: BMR 2 005, výdaj 2 807, **cieľ 2 310 kcal/deň**. Potom **týždenná adaptácia** podľa trendu (R10): pomalšie než 0,5 %/týž → dole, rýchlejšie než 0,7 %/týž → hore, krok max ±150 kcal. **Podlaha = max(1 500; BMR × 1,1)**, na začiatku 2 210 kcal. Podlaha nie je formalita: zodpovedá deficitu ~550 kcal a je presne tam, kde R1 (Murphy & Koehler 2022) končí s rastom svalov. Keď na ňu cieľ narazí, appka **neznižuje kalórie ďalej** a povie pridať kroky (R6). Číslo je orientačné; **trend hmotnosti je pravda**.
 - **Bielkoviny: ~170 g/deň** (2,0 g/kg cieľovej hmotnosti; R2), 3–4 jedlá po 35–50 g. Zdroje: mäso, ryby, vajcia, tvaroh, skyr, grécky jogurt, strukoviny, srvátkový proteín podľa potreby.
 - **Pravidlá:** (1) bielkovina v každom jedle ako prvá; (2) zelenina/ovocie 400 g+/deň, vláknina 25–35 g; (3) tekutiny prevažne bez kalórií; alkohol max 2 nápoje/týždeň; (4) 80/20 – 80 % jedál z celých potravín, zvyšok voľne; (5) nejesť „za odmenu“ po tréningu navyše; (6) víkendy sú súčasť týždňa – priemer sa počíta za 7 dní.
 - **Váženie:** denne ráno, appka počíta 7-dňový priemer; denné výkyvy ±1 kg sú voda (R10, Zheng 2015 – denné váženie je bezpečné).

@@ -1,0 +1,84 @@
+export type TemplateId = 'A' | 'B'
+export type ExerciseKind = 'load' | 'stage' | 'timed'
+export type Sex = 'm' | 'f'
+
+export interface Settings {
+  id: 1
+  createdAt: string
+  sex: Sex
+  age: number
+  heightCm: number
+  startWeightKg: number
+  targetWeightKg: number
+  bodyFatPct: number | null
+  kettlebells: number[]
+  hasBand: boolean
+  hasMat: boolean
+  daysPerWeek: 2 | 3 | 4
+  minutesPerSession: 30 | 45 | 60
+  stepsStart: number
+  stepsGoal: number
+  activityFactor: number
+  calorieTarget: number
+  programStartDate: string // ISO pondelok
+  cycleStartDate: string // ISO pondelok – odkedy sa počíta deload cyklus
+  deloadEveryWeeks: number
+  manualDeloadWeeks: string[] // ISO pondelky
+  breakReminders: boolean
+}
+
+export interface DayLog {
+  date: string // YYYY-MM-DD, primárny kľúč
+  weightKg?: number
+  steps?: number
+  sleepH?: number
+  kcal?: number
+  mobilityDone?: boolean
+}
+
+export interface Workout {
+  id?: number
+  date: string
+  template: TemplateId
+  startedAt: string
+  finishedAt?: string
+  isDeload: boolean
+  minutes: number
+}
+
+export interface SetLog {
+  id?: number
+  workoutId: number
+  date: string
+  exerciseId: string
+  setIndex: number
+  weightKg: number | null
+  reps: number | null
+  seconds: number | null
+  rpe: number
+  pain: number | null
+}
+
+export interface ExerciseState {
+  exerciseId: string
+  weightKg: number | null // load, timed
+  targetReps: number | null // load
+  variant: number // load: index do exercise.variants
+  stage: number // stage
+  target: number | null // stage: opakovania alebo sekundy; timed: sekundy
+  topStreak: number
+  failStreak: number
+  updatedAt: string
+  lastChange: string | null
+}
+
+export interface WeekReview {
+  weekStart: string
+  avgThis: number | null
+  avgPrev: number | null
+  rateKgPerWeek: number | null
+  oldTarget: number
+  newTarget: number
+  reason: string
+  createdAt: string
+}
