@@ -3,6 +3,7 @@ import { EXERCISES, EXERCISE_MAP } from '../src/domain/exercises'
 import { buildSession, estimateMinutes, nextTemplate, TEMPLATES } from '../src/domain/program'
 import { expandRoutine, routineTotalSeconds } from '../src/domain/mobility'
 import { stepGoalForWeek, weeklySteps } from '../src/domain/steps'
+import { planForToday } from '../src/domain/plan'
 
 describe('šablóny', () => {
   it('každý cvik v šablóne existuje v knižnici', () => {
@@ -82,5 +83,46 @@ describe('kroky', () => {
     expect(w.avgLogged).toBe(7000)
     expect(w.daysAtGoal).toBe(2)
     expect(w.days).toHaveLength(7)
+  })
+})
+
+describe('plán dňa', () => {
+  const settings = {
+    id: 1 as const, createdAt: '2026-09-07', sex: 'm' as const, age: 35, heightCm: 180, startWeightKg: 105, targetWeightKg: 85,
+    bodyFatPct: null, kettlebells: [12, 16, 24], hasBand: true, hasMat: true, daysPerWeek: 3 as const, minutesPerSession: 45 as const,
+    stepsStart: 6000, stepsGoal: 9000, activityFactor: 1.4, calorieTarget: 2310, programStartDate: '2026-09-07',
+    cycleStartDate: '2026-09-07', deloadEveryWeeks: 7, manualDeloadWeeks: [], breakReminders: true,
+  }
+  const w = (date: string, template: 'A' | 'B', finished = true) => ({
+    id: Math.random(), date, template, startedAt: `${date}T10:00:00Z`, finishedAt: finished ? `${date}T11:00:00Z` : undefined, isDeload: false, minutes: 45,
+  })
+
+  it('prvý tréning je A', () => {
+    const p = planForToday(settings, [], '2026-09-07')
+    expect(p.kind).toBe('workout')
+    expect(p.template).toBe('A')
+    expect(p.isDeload).toBe(false)
+  })
+  it('po A nasleduje B', () => {
+    expect(planForToday(settings, [w('2026-09-07', 'A')], '2026-09-09').template).toBe('B')
+  })
+  it('dnes už odtrénované → done', () => {
+    expect(planForToday(settings, [w('2026-09-09', 'B')], '2026-09-09').kind).toBe('done')
+  })
+  it('splnený počet dní v týždni → rest', () => {
+    const ws = [w('2026-09-07', 'A'), w('2026-09-09', 'B'), w('2026-09-11', 'A')]
+    const p = planForToday(settings, ws, '2026-09-12')
+    expect(p.kind).toBe('rest')
+    expect(p.doneThisWeek).toBe(3)
+  })
+  it('nedokončený tréning → continue', () => {
+    const p = planForToday(settings, [w('2026-09-09', 'B', false)], '2026-09-09')
+    expect(p.kind).toBe('continue')
+    expect(p.openWorkoutId).toBeDefined()
+  })
+  it('deload týždeň sa premietne do plánu', () => {
+    const p = planForToday(settings, [], '2026-10-19')
+    expect(p.isDeload).toBe(true)
+    expect(p.note).toContain('Deload')
   })
 })

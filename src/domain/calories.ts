@@ -73,7 +73,7 @@ export function adaptCalorieTarget(input: AdaptInput): AdaptResult {
   const loss = -rateKgPerWeek // kladné = chudnutie
   const [minLoss, maxLoss] = targetRateRange(weightKg)
   let rawDelta = 0
-  let reason = ''
+  let reason: string
 
   if (avgIntakeKcal !== null && avgIntakeKcal !== undefined && avgIntakeKcal > 0) {
     const measuredTdee = avgIntakeKcal + (loss * KCAL_PER_KG) / 7

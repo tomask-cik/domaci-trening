@@ -1,0 +1,248 @@
+import { useRef, useState } from 'react'
+import { Banner, Button, Card, CardTitle, NumberField, Pill } from '../components/ui'
+import { resetAll, triggerDeload, updateSettings } from '../db/actions'
+import { exportAll, importAll } from '../db/backup'
+import { db } from '../db/db'
+import { calorieFloor, mifflinStJeor, tdeeEstimate } from '../domain/calories'
+import { formatSk, todayISO } from '../domain/dates'
+import { shouldSuggestEarlyDeload, weekCalendar } from '../domain/deload'
+import { proteinTarget } from '../domain/protein'
+import type { Settings } from '../domain/types'
+import { movingAverage } from '../domain/weight'
+import { useDays, useWeekReviews } from '../hooks/useAppData'
+import { kcal, kg, signed } from '../lib/format'
+
+const KB_OPTIONS = [8, 10, 12, 16, 20, 24, 28, 32]
+
+export default function More({ settings }: { settings: Settings }) {
+  const today = todayISO()
+  const days = useDays()
+  const reviews = useWeekReviews()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!days || !reviews) return <div className="text-muted">Načítavam…</div>
+
+  const points = days.filter((d): d is typeof d & { weightKg: number } => typeof d.weightKg === 'number').map((d) => ({ date: d.date, weightKg: d.weightKg }))
+  const current = movingAverage(points, today) ?? points[points.length - 1]?.weightKg ?? settings.startWeightKg
+  const bmr = mifflinStJeor(settings.sex, current, settings.heightCm, settings.age)
+  const tdee = tdeeEstimate(bmr, settings.activityFactor)
+  const protein = proteinTarget({ targetWeightKg: settings.targetWeightKg, currentWeightKg: current, bodyFatPct: settings.bodyFatPct })
+  const calendar = weekCalendar(today, 10, settings)
+  const shortSleep = days.filter((d) => d.date >= todayISO() && typeof d.sleepH === 'number' && d.sleepH < 6).length
+  const earlyDeload = shouldSuggestEarlyDeload({ repsDroppedTwice: false, jointPain: false, shortSleepNights: shortSleep >= 3, highRpe: false })
+
+  async function doExport() {
+    const backup = await exportAll(db)
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `domaci-trening-${today}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setMessage('Záloha stiahnutá.')
+    setError(null)
+  }
+
+  async function doImport(file: File) {
+    try {
+      const text = await file.text()
+      const res = await importAll(db, JSON.parse(text))
+      const total = Object.values(res.counts).reduce((a, b) => a + b, 0)
+      setMessage(`Obnovených ${total} záznamov (${res.counts.days ?? 0} dní, ${res.counts.sets ?? 0} sérií).`)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import zlyhal.')
+      setMessage(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Nastavenia a zálohy</h1>
+
+      {message ? <Banner tone="good">{message}</Banner> : null}
+      {error ? <Banner tone="warn">{error}</Banner> : null}
+
+      <Card>
+        <CardTitle>Ciele</CardTitle>
+        <div className="space-y-3 text-sm">
+          <Line label="Kalorický cieľ" value={kcal(settings.calorieTarget)} />
+          <Line label={`Odhad výdaja (BMR × ${settings.activityFactor})`} value={kcal(tdee)} />
+          <Line label="Podlaha (BMR × 1,1)" value={kcal(calorieFloor(bmr))} />
+          <Line label="Bielkoviny" value={`${protein.gramsPerDay} g`} />
+          <p className="text-xs text-muted">Základ: {protein.basis}. Cieľ sa upravuje raz týždenne podľa 7-dňového priemeru hmotnosti.</p>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle right={earlyDeload ? <Pill tone="warn">zvážiť skôr</Pill> : undefined}>Deload kalendár</CardTitle>
+        <ul className="space-y-1 text-sm">
+          {calendar.map((w) => (
+            <li key={w.weekStart} className={`flex justify-between rounded-lg px-3 py-2 ${w.deload ? 'bg-warn/10 text-warn' : 'bg-surface2'}`}>
+              <span>
+                Týždeň {w.index + 1} · {formatSk(w.weekStart)}
+              </span>
+              <span>{w.deload ? 'deload' : 'normálny'}</span>
+            </li>
+          ))}
+        </ul>
+        <Button
+          variant="secondary"
+          className="mt-3 w-full"
+          onClick={() => {
+            if (confirm('Spustiť deload v tomto týždni? Cyklus sa prepočíta od budúceho pondelka.')) void triggerDeload(today)
+          }}
+        >
+          Spustiť deload teraz
+        </Button>
+        <p className="mt-2 text-xs text-muted">
+          Deload je automaticky každý {settings.deloadEveryWeeks}. týždeň. Skôr ho spusti, ak platia aspoň dva znaky: pokles opakovaní v dvoch tréningoch, bolesť kĺbov, spánok pod 6 h viac než 3 noci, RPE 9–10 pri bežných sériách.
+        </p>
+      </Card>
+
+      <Card>
+        <CardTitle>Tréning</CardTitle>
+        <div className="space-y-4">
+          <div>
+            <span className="mb-1 block text-sm text-muted">Dní za týždeň</span>
+            <div className="flex gap-2">
+              {([2, 3, 4] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => void updateSettings({ daysPerWeek: d })}
+                  className={`tap flex-1 rounded-xl border text-base ${settings.daysPerWeek === d ? 'border-accent bg-accent/15 text-accent' : 'border-line bg-surface2 text-muted'}`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-sm text-muted">Minút na tréning</span>
+            <div className="flex gap-2">
+              {([30, 45, 60] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => void updateSettings({ minutesPerSession: m })}
+                  className={`tap flex-1 rounded-xl border text-base ${settings.minutesPerSession === m ? 'border-accent bg-accent/15 text-accent' : 'border-line bg-surface2 text-muted'}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-sm text-muted">Kettlebelly</span>
+            <div className="flex flex-wrap gap-2">
+              {KB_OPTIONS.map((k) => {
+                const on = settings.kettlebells.includes(k)
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() =>
+                      void updateSettings({
+                        kettlebells: on ? settings.kettlebells.filter((x) => x !== k) : [...settings.kettlebells, k].sort((a, b) => a - b),
+                      })
+                    }
+                    className={`tap min-w-[4.5rem] rounded-xl border px-3 ${on ? 'border-accent bg-accent/15 text-accent' : 'border-line bg-surface2 text-muted'}`}
+                  >
+                    {k} kg
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <NumberField label="Cieľ krokov" value={settings.stepsGoal} onChange={(v) => void updateSettings({ stepsGoal: v ?? 9000 })} step={500} min={2000} max={25000} />
+          <NumberField label="Cieľová hmotnosť (kg)" value={settings.targetWeightKg} onChange={(v) => void updateSettings({ targetWeightKg: v ?? 85 })} step={0.5} decimals={1} min={40} max={200} />
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>História vyhodnotení</CardTitle>
+        {reviews.length === 0 ? (
+          <p className="text-sm text-muted">Prvé vyhodnotenie príde po uzavretí týždňa.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {[...reviews].reverse().slice(0, 8).map((r) => (
+              <li key={r.weekStart} className="rounded-lg bg-surface2 p-3">
+                <div className="flex justify-between">
+                  <span>Týždeň od {formatSk(r.weekStart)}</span>
+                  <span className={r.newTarget === r.oldTarget ? 'text-muted' : r.newTarget > r.oldTarget ? 'text-good' : 'text-warn'}>
+                    {r.newTarget === r.oldTarget ? 'bez zmeny' : `${signed(r.newTarget - r.oldTarget, 0)} kcal`}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-muted">
+                  {r.avgPrev !== null && r.avgThis !== null ? `${kg(r.avgPrev)} → ${kg(r.avgThis)}. ` : ''}
+                  {r.reason}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card>
+        <CardTitle>Záloha</CardTitle>
+        <div className="space-y-2">
+          <Button variant="secondary" className="w-full" onClick={() => void doExport()} data-testid="export">
+            Exportovať dáta (JSON)
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            data-testid="import-file"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void doImport(f)
+              e.target.value = ''
+            }}
+          />
+          <Button variant="secondary" className="w-full" onClick={() => fileRef.current?.click()}>
+            Importovať zálohu
+          </Button>
+          <p className="text-xs text-muted">Import prepíše všetky dáta v telefóne. Exportuj si zálohu pravidelne – appka nikam nič neposiela.</p>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Program</CardTitle>
+        <p className="text-sm text-muted">
+          Pravidlá tejto appky vychádzajú z dokumentov <b>RESEARCH.md</b> (dôkazy) a <b>PROGRAM.md</b> (program) v repozitári. Hlavné čísla: deficit ~500 kcal, tempo 0,5–0,7 %
+          hmotnosti za týždeň, bielkoviny {protein.gramsPerDay} g, 10–14 sérií na partiu za týždeň, 1–3 opakovania v rezerve, kroky {settings.stepsGoal}, deload každý{' '}
+          {settings.deloadEveryWeeks}. týždeň.
+        </p>
+        <p className="mt-2 text-xs text-muted">Štart programu: {formatSk(settings.programStartDate)} pri {kg(settings.startWeightKg)}.</p>
+      </Card>
+
+      <Button
+        variant="danger"
+        className="w-full"
+        onClick={() => {
+          if (confirm('Naozaj zmazať všetky dáta a začať odznova? Najprv si sprav export.')) void resetAll()
+        }}
+      >
+        Zmazať všetky dáta
+      </Button>
+      <div className="h-2" />
+    </div>
+  )
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between border-b border-line pb-2 last:border-0">
+      <span className="text-muted">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
+  )
+}
