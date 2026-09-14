@@ -53,6 +53,32 @@ describe('progresia cvikov s KB (PROGRAM.md 1.3)', () => {
     expect(r.change).toBe('hold')
     expect(r.message).toContain('Maximum')
   })
+  it('preberá váhu, s ktorou si naozaj cvičil (nie tú z plánu)', () => {
+    const r = suggestNext(squat, { ...st, weightKg: 16, targetReps: 6 }, [
+      { weightKg: 20, reps: 10, rpe: 7 },
+      { weightKg: 20, reps: 11, rpe: 8 },
+      { weightKg: 20, reps: 10, rpe: 8 },
+    ], ctx)
+    expect(r.state.weightKg).toBe(20)
+    expect(r.change).toBe('up_reps')
+  })
+  it('cieľ vychádza z odcvičených opakovaní, nie z plánu', () => {
+    const r = suggestNext(squat, { ...st, targetReps: 6 }, sets([10, 11, 10], 8), ctx)
+    expect(r.state.targetReps).toBe(11)
+  })
+  it('pri vysokom RPE nepridá +1, ale cieľ nespadne pod odcvičené', () => {
+    const r = suggestNext(squat, { ...st, targetReps: 6 }, sets([10, 11, 10], 9.5), ctx)
+    expect(r.change).toBe('hold')
+    expect(r.state.targetReps).toBe(10)
+  })
+  it('ústup ide od váhy z tréningu, nie od plánu', () => {
+    const r = suggestNext(squat, { ...st, weightKg: 12, targetReps: 8, failStreak: 1 }, [
+      { weightKg: 24, reps: 4, rpe: 9 },
+      { weightKg: 24, reps: 4, rpe: 9 },
+    ], ctx)
+    expect(r.change).toBe('down')
+    expect(r.state.weightKg).toBe(16)
+  })
   it('pravidlo 3: vysoké RPE → drž', () => {
     const r = suggestNext(squat, { ...st, targetReps: 8 }, sets([8, 8, 8], 9.5), ctx)
     expect(r.change).toBe('hold')

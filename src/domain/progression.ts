@@ -150,6 +150,15 @@ function avg(xs: number[]): number {
 }
 
 /**
+ * Váha, s ktorou si sériu naozaj odcvičil. Berie najľahšiu zo zapísaných sérií (konzervatívne).
+ * Keď séria váhu nemá (cviky bez záťaže, staršie záznamy), ostáva váha z plánu.
+ */
+function actualWeight(sets: SetInput[], planned: number | null): number | null {
+  const used = sets.map((s) => s.weightKg).filter((w): w is number => typeof w === 'number' && w > 0)
+  return used.length ? Math.min(...used) : planned
+}
+
+/**
  * PROGRAM.md 1.3 – algoritmus progresie. Čistá funkcia: stav + zapísané série → nový stav + správa.
  */
 export function suggestNext(ex: Exercise, state: ExerciseState, sets: SetInput[], ctx: ProgressionContext): Suggestion {
@@ -166,79 +175,100 @@ export function suggestNext(ex: Exercise, state: ExerciseState, sets: SetInput[]
   const avgRpe = avg(sets.map((s) => s.rpe))
 
   if (maxPain > PAIN_REGRESS_ABOVE) {
-    return regress(ex, state, ctx, `Bolesť ${maxPain}/10 – ustupujeme o krok. Ak pretrvá, použi náhradu pri bolesti.`)
+    return regress(ex, state, ctx, `Bolesť ${maxPain}/10 – ustupujeme o krok. Ak pretrvá, použi náhradu pri bolesti.`, actualWeight(sets, state.weightKg))
   }
 
   if (ex.kind === 'load') {
     const [lo, hi] = ex.range ?? [8, 12]
     const target = state.targetReps ?? lo
     const reps = sets.map((s) => s.reps ?? 0)
+    const worstReps = Math.min(...reps)
     const allHitHi = reps.every((r) => r >= hi)
     const allHitTarget = reps.every((r) => r >= target)
     const anyBelowLo = reps.some((r) => r < lo)
+    // Rozhoduje váha, ktorú si naozaj zdvihol, nie tá z plánu.
+    const usedWeight = actualWeight(sets, state.weightKg)
+    const weightChanged = usedWeight !== null && usedWeight !== state.weightKg
+    const notedWeight = weightChanged ? ` Beriem váhu ${usedWeight} kg z tréningu.` : ''
 
     if (allHitHi && avgRpe <= RPE_PROGRESS_MAX) {
-      const heavier = state.weightKg !== null ? nextHeavier(ctx.kettlebells, state.weightKg) : null
+      const heavier = usedWeight !== null ? nextHeavier(ctx.kettlebells, usedWeight) : null
       if (heavier !== null) {
         return upd(
           { weightKg: heavier, targetReps: lo, failStreak: 0, topStreak: 0 },
           'up_weight',
-          `Všetky série ${hi} op. s RPE ≤ 8,5 → ťažší kettlebell ${heavier} kg, cieľ ${lo} op.`,
+          `Všetky série ${hi} op. s RPE ≤ 8,5 → ťažší kettlebell ${heavier} kg, cieľ ${lo} op.${notedWeight}`,
         )
       }
       const variants = ex.variants ?? []
       if (state.variant < variants.length - 1) {
         const v = state.variant + 1
         return upd(
-          { variant: v, targetReps: lo, failStreak: 0, topStreak: 0 },
+          { weightKg: usedWeight, variant: v, targetReps: lo, failStreak: 0, topStreak: 0 },
           'up_variant',
-          `Nemáš ťažší kettlebell → ťažší variant: ${variants[v]}, cieľ ${lo} op.`,
+          `Nemáš ťažší kettlebell → ťažší variant: ${variants[v]}, cieľ ${lo} op.${notedWeight}`,
         )
       }
       return upd(
-        { failStreak: 0 },
+        { weightKg: usedWeight, failStreak: 0 },
         'hold',
         `Maximum vybavenia aj variantov – pridaj sériu alebo spomaľ tempo. Zváž kúpu ťažšieho kettlebellu.`,
       )
     }
     if (allHitTarget && avgRpe <= RPE_PROGRESS_MAX) {
-      const t = Math.min(hi, target + 1)
-      return upd({ targetReps: t, failStreak: 0 }, 'up_reps', `Splnené ${target} op. vo všetkých sériách → nabudúce ${t} op.`)
+      // Nový cieľ vychádza z najslabšej odcvičenej série, nie z plánu – inak by appka
+      // ignorovala, že si dal výrazne viac, než pýtala.
+      const t = Math.min(hi, Math.max(target, worstReps) + 1)
+      return upd(
+        { weightKg: usedWeight, targetReps: t, failStreak: 0 },
+        'up_reps',
+        `Najslabšia séria ${worstReps} op. pri RPE ≤ 8,5 → nabudúce ${t} op.${notedWeight}`,
+      )
     }
     if (anyBelowLo) {
       const fs = state.failStreak + 1
       if (fs >= FAIL_STREAK_TO_REGRESS) {
-        return regress(ex, state, ctx, `Dva tréningy pod ${lo} op. → ľahšie.`)
+        return regress(ex, state, ctx, `Dva tréningy pod ${lo} op. → ľahšie.`, usedWeight)
       }
-      return upd({ failStreak: fs }, 'hold', `Séria pod ${lo} op. – drž váhu; ak sa to zopakuje, ustúpime.`)
+      return upd({ weightKg: usedWeight, failStreak: fs }, 'hold', `Séria pod ${lo} op. – drž váhu; ak sa to zopakuje, ustúpime.`)
     }
-    return upd({ failStreak: 0 }, 'hold', avgRpe > RPE_PROGRESS_MAX ? `RPE ${avgRpe.toFixed(1)} – drž, kým nebude ≤ 8,5.` : `Nesplnený cieľ ${target} op. – drž.`)
+    // Cieľ ide hore aj pri vysokom RPE, ak si ho reálne prekonal – ale bez bonusového +1.
+    const held = Math.min(hi, Math.max(target, worstReps))
+    return upd(
+      { weightKg: usedWeight, targetReps: held, failStreak: 0 },
+      'hold',
+      avgRpe > RPE_PROGRESS_MAX
+        ? `RPE ${avgRpe.toFixed(1)} – držím ${held} op., kým nebude RPE ≤ 8,5.${notedWeight}`
+        : `Nesplnený cieľ ${target} op. – drž.${notedWeight}`,
+    )
   }
 
   if (ex.kind === 'timed') {
     const [lo, hi] = ex.timedRange ?? [20, 40]
     const target = state.target ?? lo
     const secs = sets.map((s) => s.seconds ?? 0)
+    const worstSecs = Math.min(...secs)
     const allHitHi = secs.every((x) => x >= hi)
     const allHitTarget = secs.every((x) => x >= target)
     const anyBelowLo = secs.some((x) => x < lo)
+    const usedWeight = actualWeight(sets, state.weightKg)
     if (allHitHi && avgRpe <= RPE_PROGRESS_MAX) {
-      const heavier = state.weightKg !== null ? nextHeavier(ctx.kettlebells, state.weightKg) : null
+      const heavier = usedWeight !== null ? nextHeavier(ctx.kettlebells, usedWeight) : null
       if (heavier !== null) {
         return upd({ weightKg: heavier, target: lo, failStreak: 0 }, 'up_weight', `${hi} s vo všetkých sériách → ${heavier} kg, cieľ ${lo} s.`)
       }
-      return upd({ failStreak: 0 }, 'hold', `Maximum ${hi} s – bez ťažšieho KB drž alebo pridaj sériu.`)
+      return upd({ weightKg: usedWeight, failStreak: 0 }, 'hold', `Maximum ${hi} s – bez ťažšieho KB drž alebo pridaj sériu.`)
     }
     if (allHitTarget && avgRpe <= RPE_PROGRESS_MAX) {
-      const t = Math.min(hi, target + TIMED_INCREMENT_SEC)
-      return upd({ target: t, failStreak: 0 }, 'up_time', `Splnené ${target} s → nabudúce ${t} s.`)
+      const t = Math.min(hi, Math.max(target, worstSecs) + TIMED_INCREMENT_SEC)
+      return upd({ weightKg: usedWeight, target: t, failStreak: 0 }, 'up_time', `Najslabšia séria ${worstSecs} s → nabudúce ${t} s.`)
     }
     if (anyBelowLo) {
       const fs = state.failStreak + 1
-      if (fs >= FAIL_STREAK_TO_REGRESS) return regress(ex, state, ctx, `Dva tréningy pod ${lo} s → ľahšie.`)
-      return upd({ failStreak: fs }, 'hold', `Pod ${lo} s – drž.`)
+      if (fs >= FAIL_STREAK_TO_REGRESS) return regress(ex, state, ctx, `Dva tréningy pod ${lo} s → ľahšie.`, usedWeight)
+      return upd({ weightKg: usedWeight, failStreak: fs }, 'hold', `Pod ${lo} s – drž.`)
     }
-    return upd({ failStreak: 0 }, 'hold', `Nesplnený cieľ ${target} s – drž.`)
+    return upd({ weightKg: usedWeight, target: Math.min(hi, Math.max(target, worstSecs)), failStreak: 0 }, 'hold', `Nesplnený cieľ ${target} s – drž.`)
   }
 
   // stage
@@ -281,8 +311,9 @@ export function suggestNext(ex: Exercise, state: ExerciseState, sets: SetInput[]
   return upd({ topStreak: 0, failStreak: 0 }, 'hold', avgRpe > RPE_PROGRESS_MAX ? `RPE ${avgRpe.toFixed(1)} – drž.` : `Nesplnený cieľ ${target} ${unitLabel} – drž.`)
 }
 
-function regress(ex: Exercise, state: ExerciseState, ctx: ProgressionContext, why: string): Suggestion {
+function regress(ex: Exercise, state: ExerciseState, ctx: ProgressionContext, why: string, usedWeight?: number | null): Suggestion {
   const base = { updatedAt: ctx.today, failStreak: 0, topStreak: 0 }
+  const fromWeight = usedWeight !== undefined ? usedWeight : state.weightKg
   if (ex.kind === 'load') {
     const [lo, hi] = ex.range ?? [8, 12]
     const target = Math.max(lo, hi - REGRESS_REPS_BELOW_HI)
@@ -291,7 +322,7 @@ function regress(ex: Exercise, state: ExerciseState, ctx: ProgressionContext, wh
       const msg = `${why} Späť na variant: ${ex.variants?.[v] ?? 'základ'}, cieľ ${target} op.`
       return { state: { ...state, ...base, variant: v, targetReps: target, lastChange: msg }, change: 'down', message: msg }
     }
-    const lighter = state.weightKg !== null ? nextLighter(ctx.kettlebells, state.weightKg) : null
+    const lighter = fromWeight !== null ? nextLighter(ctx.kettlebells, fromWeight) : null
     if (lighter !== null) {
       const msg = `${why} Ľahší kettlebell ${lighter} kg, cieľ ${target} op.`
       return { state: { ...state, ...base, weightKg: lighter, targetReps: target, lastChange: msg }, change: 'down', message: msg }
@@ -301,9 +332,9 @@ function regress(ex: Exercise, state: ExerciseState, ctx: ProgressionContext, wh
   }
   if (ex.kind === 'timed') {
     const [lo] = ex.timedRange ?? [20, 40]
-    const lighter = state.weightKg !== null ? nextLighter(ctx.kettlebells, state.weightKg) : null
+    const lighter = fromWeight !== null ? nextLighter(ctx.kettlebells, fromWeight) : null
     const msg = lighter !== null ? `${why} ${lighter} kg, cieľ ${lo} s.` : `${why} Cieľ ${lo} s.`
-    return { state: { ...state, ...base, weightKg: lighter ?? state.weightKg, target: lo, lastChange: msg }, change: 'down', message: msg }
+    return { state: { ...state, ...base, weightKg: lighter ?? fromWeight, target: lo, lastChange: msg }, change: 'down', message: msg }
   }
   const stages = ex.stages ?? []
   if (state.stage > 0) {
