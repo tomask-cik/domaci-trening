@@ -5,6 +5,7 @@ import { useSettings } from './hooks/useAppData'
 import { primeAudio } from './lib/sound'
 // Grafy (Recharts) sú najväčšia časť bundle – načítajú sa až pri otvorení záložky Telo.
 const Body = lazy(() => import('./pages/Body'))
+import History from './pages/History'
 import Library from './pages/Library'
 import Mobility from './pages/Mobility'
 import More from './pages/More'
@@ -16,6 +17,7 @@ const NAV = [
   { to: '/dnes', label: 'Dnes', icon: '📅' },
   { to: '/mobilita', label: 'Mobilita', icon: '🧘' },
   { to: '/telo', label: 'Telo', icon: '📈' },
+  { to: '/historia', label: 'História', icon: '🏆' },
   { to: '/cviky', label: 'Cviky', icon: '📚' },
   { to: '/viac', label: 'Viac', icon: '⚙️' },
 ]
@@ -65,6 +67,7 @@ export default function App() {
               </Suspense>
             }
           />
+          <Route path="/historia" element={<History />} />
           <Route path="/cviky" element={<Library settings={settings} />} />
           <Route path="/viac" element={<More settings={settings} />} />
           <Route path="*" element={<Navigate to="/dnes" replace />} />
