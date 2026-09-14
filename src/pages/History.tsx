@@ -3,16 +3,21 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Card, CardTitle, Pill, Stat } from '../components/ui'
 import { db } from '../db/db'
 import { buildHistory, personalBests, recentPrCount, type WorkoutSummary } from '../domain/history'
-import { dayOfWeekSk, formatSk, todayISO } from '../domain/dates'
+import { addDays, dayOfWeekSk, formatSk, todayISO, weekStart } from '../domain/dates'
 import { TEMPLATE_NAMES } from '../domain/program'
 import { num } from '../lib/format'
-import type { SetLog, Workout } from '../domain/types'
+import { buildWeekContext, WEEK_SYSTEM } from '../domain/summary'
+import { proteinTarget } from '../domain/protein'
+import { AiSummary } from '../components/AiSummary'
+import type { DayLog, FoodEntry, Settings, SetLog, Workout } from '../domain/types'
 
 const PAGE = 15
 
-export default function History() {
+export default function History({ settings }: { settings: Settings }) {
   const workouts = useLiveQuery(() => db.workouts.toArray(), [])
   const sets = useLiveQuery(() => db.sets.toArray(), [])
+  const days = useLiveQuery(() => db.days.toArray(), [])
+  const foods = useLiveQuery(() => db.foods.toArray(), [])
   const [limit, setLimit] = useState(PAGE)
 
   const history = useMemo(
@@ -21,7 +26,7 @@ export default function History() {
   )
   const bests = useMemo(() => personalBests((sets ?? []) as SetLog[]), [sets])
 
-  if (!workouts || !sets) return <div className="text-muted">Načítavam…</div>
+  if (!workouts || !sets || !days || !foods) return <div className="text-muted">Načítavam…</div>
 
   const today = todayISO()
   const prs28 = recentPrCount(history, today)
@@ -68,6 +73,29 @@ export default function History() {
           Cviky so záťažou sa porovnávajú cez odhad 1RM, takže 24 kg × 8 op. porazí 20 kg × 10 op. aj pri menej opakovaniach.
         </p>
       </Card>
+
+      <AiSummary
+        title="Sumár týždňa"
+        system={WEEK_SYSTEM}
+        apiKey={settings.anthropicApiKey}
+        hint="Posiela súhrnné čísla za posledných 7 dní, nie celú históriu."
+        context={buildWeekContext(
+          addDays(weekStart(today), 0),
+          addDays(weekStart(today), 6),
+          days as DayLog[],
+          foods as FoodEntry[],
+          workouts as Workout[],
+          {
+            kcal: settings.calorieTarget,
+            proteinG: proteinTarget({
+              targetWeightKg: settings.targetWeightKg,
+              referenceWeightKg: settings.startWeightKg,
+              bodyFatPct: settings.bodyFatPct,
+            }).gramsPerDay,
+          },
+          history.filter((w) => w.date >= weekStart(today)).reduce((n, w) => n + w.prs.length, 0),
+        )}
+      />
 
       <Card>
         <CardTitle right={<Pill>{history.length}</Pill>}>Odcvičené tréningy</CardTitle>

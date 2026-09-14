@@ -50,7 +50,7 @@ export default function App() {
   }
   if (settings === null) {
     return (
-      <main className="mx-auto max-w-lg px-3 pb-10 pt-4">
+      <main className="safe-top safe-x mx-auto max-w-lg pb-10">
         <Setup />
       </main>
     )
@@ -60,7 +60,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh">
-      <main className={`mx-auto max-w-lg px-3 pt-4 ${hideNav ? 'pb-6' : 'pb-28'}`}>
+      <main className={`safe-top safe-x mx-auto max-w-lg ${hideNav ? 'pb-6' : 'pb-32'}`}>
         <Routes>
           <Route path="/" element={<Navigate to="/dnes" replace />} />
           <Route path="/dnes" element={<Today settings={settings} />} />
@@ -74,7 +74,7 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="/historia" element={<History />} />
+          <Route path="/historia" element={<History settings={settings} />} />
           <Route path="/jedlo" element={<Food settings={settings} />} />
           <Route path="/cviky" element={<Library settings={settings} />} />
           <Route path="/viac" element={<More settings={settings} />} />
@@ -82,7 +82,7 @@ export default function App() {
         </Routes>
       </main>
       {!hideNav && (
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur">
+        <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur">
           <ul className="mx-auto flex max-w-lg">
             {NAV.map((n) => (
               <li key={n.to} className="flex-1">

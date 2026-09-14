@@ -222,3 +222,8 @@ export async function syncDayKcal(date: string): Promise<void> {
   if (entries.length === 0) return
   await saveDay(date, { kcal: dayTotals(entries).kcal })
 }
+
+export async function updateFood(id: number, patch: Partial<Omit<FoodEntry, 'id' | 'date'>>, date: string): Promise<void> {
+  await db.foods.update(id, patch)
+  await syncDayKcal(date)
+}

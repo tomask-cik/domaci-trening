@@ -39,6 +39,21 @@ textarea {
   color: inherit;
 }
 
+/* iOS kreslí PWA pod hodiny a pod domovský indikátor (viewport-fit=cover).
+   Bez týchto odsadení nadpis lezie pod stavový riadok. */
+@utility safe-top {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility safe-x {
+  padding-left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
+  padding-right: calc(env(safe-area-inset-right, 0px) + 0.75rem);
+}
+
 /* Veľké dotykové ciele – appka sa používa počas cvičenia. */
 @utility tap {
   min-height: 3.25rem;

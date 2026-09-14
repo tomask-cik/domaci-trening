@@ -12,6 +12,8 @@ import { parseNutrition, type Nutrition } from '../domain/food'
 
 const ENDPOINT = 'https://api.anthropic.com/v1/messages'
 const MODEL = 'claude-haiku-4-5-20251001'
+/** Sumáre potrebujú viac úsudku než vyhľadanie kalórií. */
+const MODEL_SUMMARY = 'claude-sonnet-5'
 
 const SYSTEM = `Si výživová databáza. Používateľ napíše názov jedla, nápoja, ovocia, sladkosti alebo hotového jedla po slovensky.
 Vráť VÝHRADNE JSON objekt, bez sprievodného textu a bez markdown značiek, v tvare:
@@ -81,4 +83,63 @@ export async function lookupFood(apiKey: string, query: string, signal?: AbortSi
 
   const parsed = parseNutrition(text)
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error }
+}
+
+interface CallOpts {
+  model: string
+  system: string
+  user: string
+  maxTokens: number
+  signal?: AbortSignal
+}
+
+async function callClaude(apiKey: string, o: CallOpts): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  let res: Response
+  try {
+    res = await fetch(ENDPOINT, {
+      method: 'POST',
+      signal: o.signal ?? null,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: o.model,
+        max_tokens: o.maxTokens,
+        system: o.system,
+        messages: [{ role: 'user', content: o.user }],
+      }),
+    })
+  } catch {
+    return { ok: false, error: 'Nepodarilo sa spojiť s API. Skontroluj internet.' }
+  }
+  if (!res.ok) {
+    if (res.status === 401) return { ok: false, error: 'Neplatný API kľúč. Skontroluj ho v nastaveniach.' }
+    if (res.status === 429) return { ok: false, error: 'Priveľa požiadaviek naraz. Skús o chvíľu.' }
+    return { ok: false, error: `API vrátilo chybu ${res.status}.` }
+  }
+  let data: unknown
+  try {
+    data = await res.json()
+  } catch {
+    return { ok: false, error: 'Odpoveď API sa nedá prečítať.' }
+  }
+  const text = ((data as { content?: { type?: string; text?: string }[] }).content ?? [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('\n')
+    .trim()
+  return text ? { ok: true, text } : { ok: false, error: 'API vrátilo prázdnu odpoveď.' }
+}
+
+/** Sumár dňa alebo týždňa. `context` je malý JSON objekt zo `domain/summary`. */
+export async function summarize(
+  apiKey: string,
+  system: string,
+  context: unknown,
+  signal?: AbortSignal,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  return callClaude(apiKey, { model: MODEL_SUMMARY, system, user: JSON.stringify(context), maxTokens: 700, signal })
 }

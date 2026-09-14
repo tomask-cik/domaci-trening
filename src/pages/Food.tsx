@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Banner, Button, Card, CardTitle, NumberField, Pill, Stat } from '../components/ui'
 import { db } from '../db/db'
-import { addFood, deleteFood } from '../db/actions'
+import { addFood, deleteFood, updateFood } from '../db/actions'
 import { dayTotals, proteinProgress, scaleToGrams, validGrams, type Nutrition } from '../domain/food'
 import { proteinTarget } from '../domain/protein'
+import { buildDayContext, DAY_SYSTEM } from '../domain/summary'
+import { AiSummary } from '../components/AiSummary'
 import { todayISO } from '../domain/dates'
 import { hasApiKey, lookupFood } from '../lib/claude'
 import { kcal as fmtKcal, num } from '../lib/format'
@@ -165,33 +167,95 @@ export default function Food({ settings }: { settings: Settings }) {
         ) : (
           <ul className="space-y-1">
             {entries.map((e: FoodEntry) => (
-              <li key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface2 px-3 py-2">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm">
-                    {e.name}
-                    {e.source === 'ai' ? ' ✨' : ''}
-                  </span>
-                  <span className="block text-xs text-muted">
-                    {e.grams > 0 ? `${num(e.grams)} g · ` : ''}
-                    {num(e.proteinG, 1)} g B
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="font-semibold">{e.kcal}</span>
-                  <button
-                    type="button"
-                    aria-label={`Zmazať ${e.name}`}
-                    onClick={() => void deleteFood(e.id as number, today)}
-                    className="tap w-9 rounded-lg border border-line text-muted active:bg-line"
-                  >
-                    ×
-                  </button>
-                </span>
-              </li>
+              <FoodRow key={e.id} entry={e} date={today} />
             ))}
           </ul>
         )}
       </Card>
+
+      <AiSummary
+        title="Sumár dňa"
+        system={DAY_SYSTEM}
+        apiKey={settings.anthropicApiKey}
+        hint="Posiela len dnešné čísla a názvy jedál."
+        context={buildDayContext(today, entries, undefined, { kcal: settings.calorieTarget, proteinG: protein.gramsPerDay }, false)}
+      />
     </div>
+  )
+}
+
+/** Riadok, ktorý sa dá rozkliknúť a opraviť – odhad z AI nie je vždy presný. */
+function FoodRow({ entry, date }: { entry: FoodEntry; date: string }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(entry.name)
+  const [grams, setGrams] = useState<number | null>(entry.grams)
+  const [kcalV, setKcalV] = useState<number | null>(entry.kcal)
+  const [prot, setProt] = useState<number | null>(entry.proteinG)
+
+  async function save() {
+    await updateFood(
+      entry.id as number,
+      {
+        name: name.trim() || entry.name,
+        grams: grams ?? entry.grams,
+        kcal: Math.max(0, Math.round(kcalV ?? entry.kcal)),
+        proteinG: Math.max(0, prot ?? entry.proteinG),
+        source: 'manual',
+      },
+      date,
+    )
+    setOpen(false)
+  }
+
+  return (
+    <li className="rounded-lg bg-surface2">
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="min-w-0 flex-1 text-left">
+          <span className="block truncate text-sm">
+            {entry.name}
+            {entry.source === 'ai' ? ' ✨' : ''}
+          </span>
+          <span className="block text-xs text-muted">
+            {entry.grams > 0 ? `${num(entry.grams)} g · ` : ''}
+            {num(entry.proteinG, 1)} g B · klepni na úpravu
+          </span>
+        </button>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="font-semibold">{entry.kcal}</span>
+          <button
+            type="button"
+            aria-label={`Zmazať ${entry.name}`}
+            onClick={() => void deleteFood(entry.id as number, date)}
+            className="tap w-9 rounded-lg border border-line text-muted active:bg-line"
+          >
+            ×
+          </button>
+        </span>
+      </div>
+
+      {open ? (
+        <div className="space-y-2 border-t border-line px-3 py-3">
+          <input
+            value={name}
+            onChange={(ev) => setName(ev.target.value)}
+            aria-label="Názov jedla"
+            className="tap w-full rounded-xl border border-line bg-surface px-3 text-base"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <NumberField label="g / ml" value={grams} onChange={setGrams} step={10} min={0} max={5000} />
+            <NumberField label="Kalórie" value={kcalV} onChange={setKcalV} step={10} min={0} max={5000} />
+          </div>
+          <NumberField label="Bielkoviny (g)" value={prot} onChange={setProt} step={1} min={0} max={300} />
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={() => void save()}>
+              Uložiť
+            </Button>
+            <Button variant="ghost" className="flex-1" onClick={() => setOpen(false)}>
+              Zrušiť
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </li>
   )
 }

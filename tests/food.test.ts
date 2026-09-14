@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dayTotals, parseNutrition, proteinProgress, scaleToGrams, validGrams } from '../src/domain/food'
+import { buildDayContext, buildWeekContext } from '../src/domain/summary'
 import { backupOverdue, daysSinceBackup } from '../src/lib/storage'
 import type { FoodEntry } from '../src/domain/types'
 
@@ -85,5 +86,76 @@ describe('stav zálohy', () => {
     expect(backupOverdue(undefined, now)).toBe(true)
     expect(backupOverdue('2026-09-13T12:00:00Z', now)).toBe(false)
     expect(backupOverdue('2026-08-20T12:00:00Z', now)).toBe(true)
+  })
+})
+
+describe('podklady pre AI sumár', () => {
+  it('denný kontext spočíta jedlá a doplní ciele', () => {
+    const ctx = buildDayContext(
+      '2026-09-14',
+      [entry({ name: 'Banán', kcal: 107, proteinG: 1.3 }), entry({ name: 'Tvaroh', kcal: 200, proteinG: 25 })],
+      { date: '2026-09-14', weightKg: 104.2, steps: 8000 },
+      { kcal: 2230, proteinG: 175 },
+      true,
+    )
+    expect(ctx.kcal).toBe(307)
+    expect(ctx.proteinG).toBe(26.3)
+    expect(ctx.kcalTarget).toBe(2230)
+    expect(ctx.weightKg).toBe(104.2)
+    expect(ctx.foods).toHaveLength(2)
+    expect(ctx.trainedToday).toBe(true)
+  })
+
+  it('denný kontext zvládne prázdny deň', () => {
+    const ctx = buildDayContext('2026-09-14', [], undefined, { kcal: 2230, proteinG: 175 }, false)
+    expect(ctx.kcal).toBe(0)
+    expect(ctx.weightKg).toBeNull()
+    expect(ctx.foods).toEqual([])
+  })
+
+  it('týždenný kontext ráta priemery a zmenu hmotnosti len z rozsahu', () => {
+    const ctx = buildWeekContext(
+      '2026-09-07',
+      '2026-09-13',
+      [
+        { date: '2026-09-07', weightKg: 105, steps: 6000 },
+        { date: '2026-09-13', weightKg: 104.2, steps: 10000 },
+        { date: '2026-09-20', weightKg: 100 },
+      ],
+      [entry({ date: '2026-09-07', kcal: 2000, proteinG: 150 }), entry({ date: '2026-09-13', kcal: 2400, proteinG: 170 })],
+      [
+        { id: 1, date: '2026-09-08', template: 'A', startedAt: 'x', finishedAt: 'y', isDeload: false, minutes: 45 },
+        { id: 2, date: '2026-09-25', template: 'B', startedAt: 'x', finishedAt: 'y', isDeload: false, minutes: 45 },
+      ],
+      { kcal: 2230, proteinG: 175 },
+      2,
+    )
+    expect(ctx.workouts).toBe(1)
+    expect(ctx.avgKcal).toBe(2200)
+    expect(ctx.daysLogged).toBe(2)
+    expect(ctx.weightChangeKg).toBe(-0.8)
+    expect(ctx.avgSteps).toBe(8000)
+    expect(ctx.prCount).toBe(2)
+  })
+
+  it('týždeň bez dát nevracia vymyslené čísla', () => {
+    const ctx = buildWeekContext('2026-09-07', '2026-09-13', [], [], [], { kcal: 2230, proteinG: 175 }, 0)
+    expect(ctx.avgKcal).toBeNull()
+    expect(ctx.weightChangeKg).toBeNull()
+    expect(ctx.avgSteps).toBeNull()
+    expect(ctx.workouts).toBe(0)
+  })
+
+  it('neukončené tréningy sa do týždňa nerátajú', () => {
+    const ctx = buildWeekContext(
+      '2026-09-07',
+      '2026-09-13',
+      [],
+      [],
+      [{ id: 1, date: '2026-09-08', template: 'A', startedAt: 'x', isDeload: false, minutes: 0 }],
+      { kcal: 2230, proteinG: 175 },
+      0,
+    )
+    expect(ctx.workouts).toBe(0)
   })
 })
