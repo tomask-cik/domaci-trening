@@ -159,6 +159,9 @@ export default function Today({ settings }: { settings: Settings }) {
         <CardTitle>Doplnkové (voliteľné)</CardTitle>
         <div className="space-y-4">
           <NumberField label="Spánok (h)" value={day?.sleepH ?? null} onChange={(v) => void saveDay(today, { sleepH: v ?? undefined })} step={0.5} decimals={1} min={0} max={14} />
+          <Button variant="secondary" className="w-full" onClick={() => void navigate('/jedlo')} data-testid="open-food">
+            Zapísať jedlo (odhad kalórií cez AI)
+          </Button>
           <NumberField
             label="Kalórie dnes (ak počítaš)"
             value={day?.kcal ?? null}

@@ -3,8 +3,10 @@ import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { applyPendingReviews, ensureExerciseStates } from './db/actions'
 import { useSettings } from './hooks/useAppData'
 import { primeAudio } from './lib/sound'
+import { requestPersistentStorage } from './lib/storage'
 // Grafy (Recharts) sú najväčšia časť bundle – načítajú sa až pri otvorení záložky Telo.
 const Body = lazy(() => import('./pages/Body'))
+import Food from './pages/Food'
 import History from './pages/History'
 import Library from './pages/Library'
 import Mobility from './pages/Mobility'
@@ -25,6 +27,11 @@ const NAV = [
 export default function App() {
   const settings = useSettings()
   const location = useLocation()
+
+  useEffect(() => {
+    // Požiada prehliadač, aby IndexedDB nemazal (Safari inak vie úložisko vyhodiť).
+    void requestPersistentStorage()
+  }, [])
 
   useEffect(() => {
     const unlock = () => primeAudio()
@@ -68,6 +75,7 @@ export default function App() {
             }
           />
           <Route path="/historia" element={<History />} />
+          <Route path="/jedlo" element={<Food settings={settings} />} />
           <Route path="/cviky" element={<Library settings={settings} />} />
           <Route path="/viac" element={<More settings={settings} />} />
           <Route path="*" element={<Navigate to="/dnes" replace />} />

@@ -3,11 +3,12 @@ import { STEPS_GOAL, STEPS_START } from '../domain/constants'
 import { todayISO, weekStart } from '../domain/dates'
 import { startManualDeload } from '../domain/deload'
 import { EXERCISES, getExercise } from '../domain/exercises'
+import { dayTotals } from '../domain/food'
 import { isDeloadWeek } from '../domain/deload'
 import { buildSession } from '../domain/program'
 import { initialState, suggestNext, type ChangeKind } from '../domain/progression'
 import { computeWeeklyReview, pendingReviewWeeks } from '../domain/review'
-import type { DayLog, ExerciseState, Settings, SetLog, TemplateId } from '../domain/types'
+import type { DayLog, ExerciseState, FoodEntry, Settings, SetLog, TemplateId } from '../domain/types'
 import { db } from './db'
 
 export interface SetupInput {
@@ -190,11 +191,34 @@ export function sessionFor(settings: Settings, template: TemplateId, isDeload: b
 }
 
 export async function resetAll(): Promise<void> {
-  await db.transaction('rw', [db.settings, db.days, db.workouts, db.sets, db.exerciseStates, db.weekReviews], async () => {
-    await Promise.all([db.settings.clear(), db.days.clear(), db.workouts.clear(), db.sets.clear(), db.exerciseStates.clear(), db.weekReviews.clear()])
+  await db.transaction('rw', [db.settings, db.days, db.workouts, db.sets, db.exerciseStates, db.weekReviews, db.foods], async () => {
+    await Promise.all([db.settings.clear(), db.days.clear(), db.workouts.clear(), db.sets.clear(), db.exerciseStates.clear(), db.weekReviews.clear(), db.foods.clear()])
   })
 }
 
 export async function getWorkoutSets(workoutId: number): Promise<SetLog[]> {
   return db.sets.where('workoutId').equals(workoutId).toArray()
+}
+
+// --- Denník jedla ---
+
+export async function addFood(entry: Omit<FoodEntry, 'id'>): Promise<void> {
+  await db.foods.add(entry as FoodEntry)
+  await syncDayKcal(entry.date)
+}
+
+export async function deleteFood(id: number, date: string): Promise<void> {
+  await db.foods.delete(id)
+  await syncDayKcal(date)
+}
+
+/**
+ * Prepíše kcal v dennom zázname súčtom jedál.
+ * Keď za deň nie je zapísané žiadne jedlo, ručne zadanú hodnotu necháme tak –
+ * inak by zmazanie poslednej položky vymazalo aj číslo, ktoré si zadal sám.
+ */
+export async function syncDayKcal(date: string): Promise<void> {
+  const entries = await db.foods.where('date').equals(date).toArray()
+  if (entries.length === 0) return
+  await saveDay(date, { kcal: dayTotals(entries).kcal })
 }

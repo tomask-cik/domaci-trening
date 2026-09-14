@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { DayLog, ExerciseState, SetLog, Settings, WeekReview, Workout } from '../domain/types'
+import type { DayLog, ExerciseState, FoodEntry, SetLog, Settings, WeekReview, Workout } from '../domain/types'
 
 export class TrainingDB extends Dexie {
   settings!: EntityTable<Settings, 'id'>
@@ -8,6 +8,7 @@ export class TrainingDB extends Dexie {
   sets!: EntityTable<SetLog, 'id'>
   exerciseStates!: EntityTable<ExerciseState, 'exerciseId'>
   weekReviews!: EntityTable<WeekReview, 'weekStart'>
+  foods!: EntityTable<FoodEntry, 'id'>
 
   constructor(name = 'domaci-trening') {
     super(name)
@@ -19,10 +20,14 @@ export class TrainingDB extends Dexie {
       exerciseStates: 'exerciseId',
       weekReviews: 'weekStart',
     })
+    // v2: denník jedla. Dexie doplní tabuľku bez straty existujúcich dát.
+    this.version(2).stores({
+      foods: '++id, date',
+    })
   }
 }
 
 export const db = new TrainingDB()
 
-export const TABLE_NAMES = ['settings', 'days', 'workouts', 'sets', 'exerciseStates', 'weekReviews'] as const
+export const TABLE_NAMES = ['settings', 'days', 'workouts', 'sets', 'exerciseStates', 'weekReviews', 'foods'] as const
 export type TableName = (typeof TABLE_NAMES)[number]

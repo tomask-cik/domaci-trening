@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Banner, Button, Card, CardTitle, NumberField, Pill } from '../components/ui'
 import { resetAll, triggerDeload, updateSettings } from '../db/actions'
 import { exportAll, importAll } from '../db/backup'
@@ -11,6 +11,8 @@ import type { Settings } from '../domain/types'
 import { movingAverage } from '../domain/weight'
 import { useDays, useWeekReviews } from '../hooks/useAppData'
 import { kcal, kg, signed } from '../lib/format'
+import { backupOverdue, daysSinceBackup, isStoragePersisted } from '../lib/storage'
+import { hasApiKey } from '../lib/claude'
 
 const KB_OPTIONS = [8, 10, 12, 16, 20, 24, 28, 32]
 
@@ -21,6 +23,12 @@ export default function More({ settings }: { settings: Settings }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [persisted, setPersisted] = useState<boolean | null>(null)
+  const [keyDraft, setKeyDraft] = useState('')
+
+  useEffect(() => {
+    void isStoragePersisted().then(setPersisted)
+  }, [])
 
   if (!days || !reviews) return <div className="text-muted">Načítavam…</div>
 
@@ -44,7 +52,8 @@ export default function More({ settings }: { settings: Settings }) {
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setMessage('Záloha stiahnutá.')
+    await updateSettings({ lastBackupAt: new Date().toISOString() })
+    setMessage('Záloha stiahnutá. Ulož si ju do iCloud Drive alebo Google Drive – v Stiahnutých je len v tomto telefóne.')
     setError(null)
   }
 
@@ -190,8 +199,28 @@ export default function More({ settings }: { settings: Settings }) {
       </Card>
 
       <Card>
-        <CardTitle>Záloha</CardTitle>
-        <div className="space-y-2">
+        <CardTitle
+          right={
+            backupOverdue(settings.lastBackupAt) ? <Pill tone="warn">treba zálohu</Pill> : <Pill tone="good">zálohované</Pill>
+          }
+        >
+          Záloha
+        </CardTitle>
+        {backupOverdue(settings.lastBackupAt) ? (
+          <Banner tone="warn">
+            {settings.lastBackupAt
+              ? `Posledná záloha pred ${String(daysSinceBackup(settings.lastBackupAt))} dňami. Sťahuj si ju aspoň raz za dva týždne.`
+              : 'Ešte si nikdy nezálohoval. Všetky dáta sú len v tomto telefóne – ak ho stratíš, stratíš aj históriu.'}
+          </Banner>
+        ) : (
+          <p className="mb-2 text-xs text-muted">Posledná záloha pred {String(daysSinceBackup(settings.lastBackupAt))} dňami.</p>
+        )}
+        {persisted === false ? (
+          <Banner tone="warn">
+            Prehliadač zatiaľ nesľúbil, že dáta nezmaže. Pomôže pridať appku na plochu a chvíľu ju používať – potom sa to zvyčajne prepne samo.
+          </Banner>
+        ) : null}
+        <div className="mt-2 space-y-2">
           <Button variant="secondary" className="w-full" onClick={() => void doExport()} data-testid="export">
             Exportovať dáta (JSON)
           </Button>
@@ -212,6 +241,54 @@ export default function More({ settings }: { settings: Settings }) {
           </Button>
           <p className="text-xs text-muted">Import prepíše všetky dáta v telefóne. Exportuj si zálohu pravidelne – appka nikam nič neposiela.</p>
         </div>
+      </Card>
+
+      <Card>
+        <CardTitle right={hasApiKey(settings.anthropicApiKey) ? <Pill tone="good">nastavený</Pill> : <Pill>chýba</Pill>}>
+          Odhad kalórií cez AI
+        </CardTitle>
+        <p className="mb-2 text-sm text-muted">
+          Napíšeš názov jedla a gramáž, Claude odhadne kalórie a bielkoviny. Potrebuje tvoj vlastný API kľúč z console.anthropic.com. Kľúč sa uloží len do tohto telefónu,
+          nikdy nejde do repozitára – nikam ho nekopíruj do kódu.
+        </p>
+        <input
+          type="password"
+          value={keyDraft}
+          onChange={(e) => setKeyDraft(e.target.value)}
+          placeholder={hasApiKey(settings.anthropicApiKey) ? 'kľúč je uložený – sem vlož nový' : 'sk-ant-...'}
+          autoComplete="off"
+          data-testid="api-key"
+          className="tap w-full rounded-xl border border-line bg-surface2 px-3 text-base"
+        />
+        <div className="mt-2 flex gap-2">
+          <Button
+            variant="secondary"
+            className="flex-1"
+            disabled={keyDraft.trim().length < 20}
+            onClick={() => {
+              void updateSettings({ anthropicApiKey: keyDraft.trim() })
+              setKeyDraft('')
+              setMessage('Kľúč uložený.')
+            }}
+          >
+            Uložiť kľúč
+          </Button>
+          {hasApiKey(settings.anthropicApiKey) ? (
+            <Button
+              variant="ghost"
+              className="flex-1"
+              onClick={() => {
+                void updateSettings({ anthropicApiKey: undefined })
+                setMessage('Kľúč zmazaný.')
+              }}
+            >
+              Zmazať kľúč
+            </Button>
+          ) : null}
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Odhady sú orientačné – vychádzajú z typických hodnôt, nie z obalu tvojho konkrétneho výrobku. Pri baleniach je presnejšie opísať údaj z etikety.
+        </p>
       </Card>
 
       <Card>

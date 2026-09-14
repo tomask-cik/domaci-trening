@@ -25,6 +25,21 @@ export interface Settings {
   deloadEveryWeeks: number
   manualDeloadWeeks: string[] // ISO pondelky
   breakReminders: boolean
+  /** Kľúč k Claude API pre odhad kalórií. Ostáva len v tomto zariadení. */
+  anthropicApiKey?: string
+  /** ISO čas poslednej úspešnej zálohy. */
+  lastBackupAt?: string
+}
+
+export interface FoodEntry {
+  id?: number
+  date: string
+  name: string
+  grams: number
+  kcal: number
+  proteinG: number
+  source: 'ai' | 'manual'
+  note?: string
 }
 
 export interface DayLog {
