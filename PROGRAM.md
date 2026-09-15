@@ -88,6 +88,8 @@ Každá séria sa zapíše ako (váha, opakovania, RPE 6–10). RIR = 10 − RPE
 3. **Drž:** ak niektorá séria nedosiahla `t`, alebo RPE ≥ 9,5 → rovnaké `w` a `t`.
 4. **Ustúp:** ak 2 tréningy za sebou nedosiahnuté `lo` v niektorej sérii, alebo nahlásená bolesť > 3/10 → ľahší kettlebell (`t = hi − 3`) alebo regresný variant.
 5. **Deload týždeň:** 2 série namiesto 3, rovnaké `w`, `t − 2`, pravidlá 1–4 sa nevyhodnocujú (R11).
+6. **Rozcvičovacie série** (označené v appke) sa evidujú, ale do pravidiel 1–4, rekordov ani objemu nevstupujú – 12 kg × 15 z rozcvičky by inak zmenilo cieľ.
+7. **Výmena cviku v tréningu** (bolesť, obsadená hrazda): náhrada preberá miesto, série a pauzu, vyhodnocuje sa podľa vlastného stavu; šablóna sa nemení a ďalší tréning ide opäť podľa plánu. **Ručná úprava plánu** v knižnici (štádium, váha, cieľ) vynuluje počítadlá a je novým bodom štartu.
 
 **Cviky s vlastnou váhou (štádiá)** – zhyby, dipy, kliky:
 

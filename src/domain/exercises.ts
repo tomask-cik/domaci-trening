@@ -11,6 +11,18 @@ export interface Stage {
 /** Partie pre kontrolu týždenného objemu (RESEARCH R3). `direct` = pracovná séria pre danú partiu. */
 export type MuscleGroup = 'chrbat' | 'hrudnik_triceps' | 'ramena' | 'kvadricepsy' | 'zadok_hamstringy' | 'lytka' | 'stred'
 
+export const MUSCLE_GROUPS: MuscleGroup[] = ['chrbat', 'hrudnik_triceps', 'ramena', 'kvadricepsy', 'zadok_hamstringy', 'lytka', 'stred']
+
+export const MUSCLE_GROUP_LABEL: Record<MuscleGroup, string> = {
+  chrbat: 'Chrbát',
+  hrudnik_triceps: 'Hrudník a triceps',
+  ramena: 'Ramená',
+  kvadricepsy: 'Kvadricepsy',
+  zadok_hamstringy: 'Zadok a hamstringy',
+  lytka: 'Lýtka',
+  stred: 'Stred tela',
+}
+
 export interface Exercise {
   id: string
   name: string

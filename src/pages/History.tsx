@@ -2,13 +2,16 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Card, CardTitle, Pill, Stat } from '../components/ui'
 import { db } from '../db/db'
+import { actualWeeklyVolume, adherence, plannedWeeklyVolume, volumeLines } from '../domain/analytics'
 import { buildHistory, personalBests, recentPrCount, type WorkoutSummary } from '../domain/history'
 import { addDays, dayOfWeekSk, formatSk, todayISO, weekStart } from '../domain/dates'
+import { MUSCLE_GROUP_LABEL } from '../domain/exercises'
 import { TEMPLATE_NAMES } from '../domain/program'
 import { num } from '../lib/format'
 import { buildWeekContext, WEEK_SYSTEM } from '../domain/summary'
-import { proteinTarget } from '../domain/protein'
+import { proteinFor } from '../domain/protein'
 import { AiSummary } from '../components/AiSummary'
+import { WatchCard } from '../components/WatchCard'
 import type { DayLog, FoodEntry, RunLog, Settings, SetLog, Workout } from '../domain/types'
 
 const PAGE = 15
@@ -32,6 +35,9 @@ export default function History({ settings }: { settings: Settings }) {
   const today = todayISO()
   const prs28 = recentPrCount(history, today)
   const totalVolume = history.reduce((n, w) => n + w.volumeKg, 0)
+  const thisWeek = weekStart(today)
+  const volume = volumeLines(actualWeeklyVolume(sets as SetLog[], thisWeek), plannedWeeklyVolume(settings, workouts as Workout[], thisWeek))
+  const adh = adherence(settings, workouts as Workout[], today)
 
   if (history.length === 0) {
     return (
@@ -55,6 +61,59 @@ export default function History({ settings }: { settings: Settings }) {
         <Stat label="Rekordy 28 dní" value={prs28} tone={prs28 > 0 ? 'good' : 'ink'} />
         <Stat label="Nazdvíhané" value={`${num(Math.round(totalVolume / 1000), 1)} t`} sub="váha × opakovania" />
       </div>
+
+      <Card>
+        <CardTitle right={<Pill tone={adh.thisWeek.done >= adh.thisWeek.planned ? 'good' : 'muted'}>{adh.thisWeek.done}/{adh.thisWeek.planned} tréningov</Pill>}>
+          Objem tento týždeň
+        </CardTitle>
+        <ul className="space-y-2" data-testid="volume-lines">
+          {volume.map((l) => {
+            const pct = l.planned > 0 ? Math.min(100, Math.round((l.done / l.planned) * 100)) : 0
+            return (
+              <li key={l.group} className="text-sm">
+                <div className="flex justify-between">
+                  <span>{MUSCLE_GROUP_LABEL[l.group]}</span>
+                  <span className={l.done >= l.planned && l.planned > 0 ? 'text-good' : 'text-muted'}>
+                    {l.done}/{l.planned} sérií
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2">
+                  <div className={`h-full rounded-full ${pct >= 100 ? 'bg-good' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+        <p className="mt-2 text-xs text-muted">
+          Odcvičené pracovné série na partiu oproti plánu šablón (pondelok–nedeľa). Pri chudnutí je toto hlavný znak, že objem na udržanie svalov nie je len na papieri (RESEARCH R3).
+        </p>
+      </Card>
+
+      <Card>
+        <CardTitle right={adh.pct !== null ? <Pill tone={adh.pct >= 80 ? 'good' : adh.pct >= 60 ? 'warn' : 'muted'}>{adh.pct} %</Pill> : undefined}>Dodržiavanie plánu</CardTitle>
+        {adh.weeks.length === 0 ? (
+          <p className="text-sm text-muted">Prvý uzavretý týždeň príde v pondelok. Zatiaľ tento týždeň {adh.thisWeek.done}/{adh.thisWeek.planned}.</p>
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              {adh.doneTotal} z {adh.plannedTotal} plánovaných tréningov za {adh.weeks.length} {adh.weeks.length === 1 ? 'týždeň' : adh.weeks.length < 5 ? 'týždne' : 'týždňov'}.
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {adh.weeks.slice(-12).map((w) => (
+                <li
+                  key={w.weekStart}
+                  title={`Týždeň od ${formatSk(w.weekStart)}`}
+                  className={`rounded-lg px-2 py-1 text-xs ${w.done >= w.planned ? 'bg-good/15 text-good' : w.done > 0 ? 'bg-warn/15 text-warn' : 'bg-surface2 text-muted'}`}
+                >
+                  {w.weekStart.slice(5).replace('-', '.')} · {w.done}/{w.planned}
+                  {w.deload ? ' D' : ''}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">Ukončené silové tréningy z plánovaného počtu dní za týždeň (D = deload). Bežiaci týždeň sa do percenta neráta.</p>
+          </>
+        )}
+      </Card>
 
       <Card>
         <CardTitle right={<Pill>{bests.length} cvikov</Pill>}>Osobné rekordy</CardTitle>
@@ -81,20 +140,13 @@ export default function History({ settings }: { settings: Settings }) {
         apiKey={settings.anthropicApiKey}
         hint="Posiela súhrnné čísla za posledných 7 dní, nie celú históriu."
         context={buildWeekContext(
-          addDays(weekStart(today), 0),
-          addDays(weekStart(today), 6),
+          addDays(today, -6),
+          today,
           days as DayLog[],
           foods as FoodEntry[],
           workouts as Workout[],
-          {
-            kcal: settings.calorieTarget,
-            proteinG: proteinTarget({
-              targetWeightKg: settings.targetWeightKg,
-              referenceWeightKg: settings.startWeightKg,
-              bodyFatPct: settings.bodyFatPct,
-            }).gramsPerDay,
-          },
-          history.filter((w) => w.date >= weekStart(today)).reduce((n, w) => n + w.prs.length, 0),
+          { kcal: settings.calorieTarget, proteinG: proteinFor(settings).gramsPerDay },
+          recentPrCount(history, today, 6),
           runs as RunLog[],
         )}
       />
@@ -103,7 +155,7 @@ export default function History({ settings }: { settings: Settings }) {
         <CardTitle right={<Pill>{history.length}</Pill>}>Odcvičené tréningy</CardTitle>
         <ul className="space-y-2">
           {history.slice(0, limit).map((w) => (
-            <WorkoutRow key={w.workoutId} w={w} />
+            <WorkoutRow key={w.workoutId} w={w} settings={settings} />
           ))}
         </ul>
         {limit < history.length ? (
@@ -121,7 +173,7 @@ export default function History({ settings }: { settings: Settings }) {
   )
 }
 
-function WorkoutRow({ w }: { w: WorkoutSummary }) {
+function WorkoutRow({ w, settings }: { w: WorkoutSummary; settings: Settings }) {
   return (
     <li className="rounded-xl border border-line bg-surface2">
       <details>
@@ -134,6 +186,8 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
               Tréning {w.template} · {w.setCount} sérií
               {w.volumeKg > 0 ? ` · ${num(w.volumeKg)} kg` : ''}
               {w.avgRpe !== null ? ` · RPE ${num(w.avgRpe, 1)}` : ''}
+              {w.healthKcal !== null ? ` · ⌚️ ${w.healthKcal} kcal` : ''}
+              {w.healthAvgHr !== null ? ` · tep ${w.healthAvgHr}` : ''}
             </span>
           </span>
           <span className="flex shrink-0 gap-1">
@@ -147,14 +201,15 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
           <p className="mb-2 text-xs text-muted">{TEMPLATE_NAMES[w.template]}</p>
           <ul className="space-y-1 text-sm">
             {w.exercises.map((e) => (
-              <li key={e.exerciseId} className="flex items-center justify-between gap-2">
+              <li key={e.exerciseId} className="flex flex-wrap items-center justify-between gap-x-2">
                 <span className="min-w-0 truncate">
                   {e.isPr ? '🏆 ' : ''}
                   {e.name}
                 </span>
                 <span className={`shrink-0 ${e.isPr ? 'font-semibold text-good' : 'text-muted'}`}>
-                  {e.setCount}× · {e.best}
+                  {e.setCount}×{e.warmupCount ? ` (+${e.warmupCount} rozcv.)` : ''} · {e.best}
                 </span>
+                {e.notes.length ? <span className="basis-full text-xs text-muted">✎ {e.notes.join(' · ')}</span> : null}
               </li>
             ))}
           </ul>
@@ -163,6 +218,13 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
               Nový rekord: {w.prs.map((p) => `${p.name} ${p.detail}`).join(', ')}
             </p>
           ) : null}
+          <div className="mt-3">
+            <WatchCard
+              workout={{ id: w.workoutId, startedAt: w.startedAt, finishedAt: w.finishedAt, healthKcal: w.healthKcal, healthAvgHr: w.healthAvgHr }}
+              settings={settings}
+              compact
+            />
+          </div>
         </div>
       </details>
     </li>

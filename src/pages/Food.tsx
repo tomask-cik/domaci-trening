@@ -4,11 +4,15 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Banner, Button, Card, CardTitle, NumberField, Pill, Stat } from '../components/ui'
 import { db } from '../db/db'
 import { addFood, deleteFood, updateFood } from '../db/actions'
+import { dailyCalorieTarget } from '../domain/calories'
+import { isDeloadWeek } from '../domain/deload'
 import { dayTotals, proteinProgress, scaleToGrams, validGrams, type Nutrition } from '../domain/food'
-import { proteinTarget } from '../domain/protein'
+import { proteinFor } from '../domain/protein'
 import { buildDayContext, DAY_SYSTEM } from '../domain/summary'
 import { AiSummary } from '../components/AiSummary'
 import { todayISO } from '../domain/dates'
+import { currentWeightKg } from '../domain/weight'
+import { useDay, useDays } from '../hooks/useAppData'
 import { hasApiKey, lookupFood } from '../lib/claude'
 import { kcal as fmtKcal, num } from '../lib/format'
 import type { FoodEntry, Settings } from '../domain/types'
@@ -18,6 +22,9 @@ export default function Food({ settings }: { settings: Settings }) {
   const today = todayISO()
   const entries = useLiveQuery(() => db.foods.where('date').equals(today).toArray(), [today])
   const runs = useLiveQuery(() => db.runs.where('date').equals(today).toArray(), [today])
+  const trainedToday = useLiveQuery(async () => (await db.workouts.where('date').equals(today).filter((w) => Boolean(w.finishedAt)).count()) > 0, [today])
+  const days = useDays()
+  const day = useDay(today)
 
   const [name, setName] = useState('')
   const [grams, setGrams] = useState<number | null>(100)
@@ -26,14 +33,12 @@ export default function Food({ settings }: { settings: Settings }) {
   const [found, setFound] = useState<Nutrition | null>(null)
   const [manualKcal, setManualKcal] = useState<number | null>(null)
 
-  if (!entries) return <div className="text-muted">Načítavam…</div>
+  if (!entries || !days || day === undefined) return <div className="text-muted">Načítavam…</div>
 
   const totals = dayTotals(entries)
-  const protein = proteinTarget({
-    targetWeightKg: settings.targetWeightKg,
-    referenceWeightKg: settings.startWeightKg,
-    bodyFatPct: settings.bodyFatPct,
-  })
+  const protein = proteinFor(settings)
+  // Ten istý cieľ ako na Dnes – v deloade udržiavacia úroveň, nie deficit.
+  const target = dailyCalorieTarget(settings, currentWeightKg(days, today, settings.startWeightKg), isDeloadWeek(today, settings))
   const keyReady = hasApiKey(settings.anthropicApiKey)
   const preview = found && validGrams(grams) ? scaleToGrams(found, grams as number) : null
 
@@ -93,7 +98,7 @@ export default function Food({ settings }: { settings: Settings }) {
       </header>
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Kalórie" value={totals.kcal} sub={`cieľ ${settings.calorieTarget}`} tone={totals.kcal > settings.calorieTarget ? 'warn' : 'ink'} />
+        <Stat label="Kalórie" value={totals.kcal} sub={target.isMaintenance ? `cieľ ${target.kcal} (deload)` : `cieľ ${target.kcal}`} tone={totals.kcal > target.kcal ? 'warn' : 'ink'} />
         <Stat label="Bielkoviny" value={`${num(totals.proteinG)} g`} sub={`cieľ ${protein.gramsPerDay} g`} />
         <Stat label="Položiek" value={totals.count} sub={`${proteinProgress(totals, protein.gramsPerDay)} % bielkovín`} />
       </div>
@@ -179,7 +184,7 @@ export default function Food({ settings }: { settings: Settings }) {
         system={DAY_SYSTEM}
         apiKey={settings.anthropicApiKey}
         hint="Posiela len dnešné čísla a názvy jedál."
-        context={buildDayContext(today, entries, undefined, { kcal: settings.calorieTarget, proteinG: protein.gramsPerDay }, false, runs ?? [])}
+        context={buildDayContext(today, entries, day ?? undefined, { kcal: target.kcal, proteinG: protein.gramsPerDay }, trainedToday ?? false, runs ?? [])}
       />
     </div>
   )

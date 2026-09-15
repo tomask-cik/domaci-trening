@@ -1,5 +1,5 @@
 import { initialCalorieTarget, mifflinStJeor } from '../domain/calories'
-import { STEPS_GOAL, STEPS_START } from '../domain/constants'
+import { ACTIVITY_FACTOR, DELOAD_EVERY_WEEKS, STEPS_GOAL, STEPS_START } from '../domain/constants'
 import { todayISO, weekStart } from '../domain/dates'
 import { startManualDeload } from '../domain/deload'
 import { EXERCISES, getExercise } from '../domain/exercises'
@@ -7,7 +7,7 @@ import { dayTotals } from '../domain/food'
 import type { HealthImport } from '../domain/healthImport'
 import { isDeloadWeek } from '../domain/deload'
 import { buildSession } from '../domain/program'
-import { initialState, suggestNext, type ChangeKind } from '../domain/progression'
+import { applyOverride, initialState, suggestNext, type ChangeKind, type StateOverride } from '../domain/progression'
 import { computeWeeklyReview, pendingReviewWeeks } from '../domain/review'
 import type { DayLog, ExerciseState, FoodEntry, RunLog, Settings, SetLog, TemplateId } from '../domain/types'
 import { db } from './db'
@@ -45,11 +45,11 @@ export async function saveSetup(input: SetupInput, today = todayISO()): Promise<
     minutesPerSession: input.minutesPerSession,
     stepsStart: input.stepsStart || STEPS_START,
     stepsGoal: STEPS_GOAL,
-    activityFactor: DEFAULTS_ACTIVITY,
+    activityFactor: ACTIVITY_FACTOR,
     calorieTarget: initialCalorieTarget(bmr),
     programStartDate: today,
     cycleStartDate: weekStart(today),
-    deloadEveryWeeks: DEFAULTS_DELOAD,
+    deloadEveryWeeks: DELOAD_EVERY_WEEKS,
     manualDeloadWeeks: [],
     breakReminders: true,
   }
@@ -58,9 +58,6 @@ export async function saveSetup(input: SetupInput, today = todayISO()): Promise<
   await db.days.put({ date: today, weightKg: input.startWeightKg })
   return settings
 }
-
-const DEFAULTS_ACTIVITY = 1.4
-const DEFAULTS_DELOAD = 7
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   const cur = await db.settings.get(1)
@@ -83,9 +80,15 @@ export async function getState(exerciseId: string, settings: Settings, today: st
   return fresh
 }
 
+/**
+ * Doplní polia dňa. Čítanie a zápis sú v jednej transakcii – dva rýchle zápisy po sebe
+ * (hmotnosť a hneď kroky) inak prečítajú ten istý starý riadok a druhý prepíše prvý.
+ */
 export async function saveDay(date: string, patch: Partial<DayLog>): Promise<void> {
-  const cur = (await db.days.get(date)) ?? { date }
-  await db.days.put({ ...cur, ...patch, date })
+  await db.transaction('rw', db.days, async () => {
+    const cur = (await db.days.get(date)) ?? { date }
+    await db.days.put({ ...cur, ...patch, date })
+  })
 }
 
 export async function startWorkout(settings: Settings, template: TemplateId, today = todayISO()): Promise<number> {
@@ -114,8 +117,23 @@ export async function logSet(entry: Omit<SetLog, 'id'>): Promise<number> {
   return (await db.sets.add(entry)) as number
 }
 
+/**
+ * Zmaže sériu a prečísluje zvyšné série toho istého cviku v tréningu na 0..n−1.
+ * Bez toho by po zmazaní série 2 z troch mal ďalší zápis index 2 a prepísal by tretiu.
+ */
 export async function deleteSet(id: number): Promise<void> {
-  await db.sets.delete(id)
+  await db.transaction('rw', db.sets, async () => {
+    const gone = await db.sets.get(id)
+    if (!gone) return
+    await db.sets.delete(id)
+    const rest = (await db.sets.where('workoutId').equals(gone.workoutId).filter((s) => s.exerciseId === gone.exerciseId).toArray()).sort(
+      (a, b) => a.setIndex - b.setIndex,
+    )
+    for (let i = 0; i < rest.length; i++) {
+      const s = rest[i] as SetLog
+      if (s.setIndex !== i) await db.sets.update(s.id as number, { setIndex: i })
+    }
+  })
 }
 
 export interface ProgressionResult {
@@ -132,6 +150,7 @@ export async function finishWorkout(workoutId: number, settings: Settings, today
   const sets = await db.sets.where('workoutId').equals(workoutId).toArray()
   const byExercise = new Map<string, SetLog[]>()
   for (const s of sets) {
+    if (s.warmup) continue // rozcvičovacie série progresiu neovplyvňujú
     const arr = byExercise.get(s.exerciseId) ?? []
     arr.push(s)
     byExercise.set(s.exerciseId, arr)
@@ -152,6 +171,25 @@ export async function finishWorkout(workoutId: number, settings: Settings, today
   }
   await db.workouts.put({ ...workout, finishedAt: new Date().toISOString() })
   return results
+}
+
+/** Ručná úprava stavu cviku z knižnice (štádium, váha, cieľ, variant). */
+export async function overrideExerciseState(exerciseId: string, patch: StateOverride, settings: Settings, today = todayISO()): Promise<ExerciseState> {
+  const ex = getExercise(exerciseId)
+  const cur = await getState(exerciseId, settings, today)
+  const next = applyOverride(ex, cur, patch, today)
+  await db.exerciseStates.put(next)
+  return next
+}
+
+/** Vymení cvik na pozícii `order` v tréningu; `null` vráti pôvodný. Len kým k pozícii nie sú zapísané série. */
+export async function setSwap(workoutId: number, order: number, exerciseId: string | null): Promise<void> {
+  const w = await db.workouts.get(workoutId)
+  if (!w) return
+  const swaps = { ...(w.swaps ?? {}) }
+  if (exerciseId === null) delete swaps[order]
+  else swaps[order] = exerciseId
+  await db.workouts.update(workoutId, { swaps })
 }
 
 export async function discardWorkout(workoutId: number): Promise<void> {

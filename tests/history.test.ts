@@ -95,6 +95,34 @@ describe('história tréningov', () => {
     expect(h).toEqual([])
   })
 
+  it('rozcvičovacie série: nie sú rekord, objem ani počet, bolesť z nich sa ale ukáže', () => {
+    const w = [workout(1, '2026-09-01'), workout(2, '2026-09-03')]
+    const s = [
+      set(1, '2026-09-01', 'goblet_squat', { weightKg: 16, reps: 8 }),
+      set(2, '2026-09-03', 'goblet_squat', { weightKg: 24, reps: 12, warmup: true, pain: 4, setIndex: 0 }),
+      set(2, '2026-09-03', 'goblet_squat', { weightKg: 16, reps: 8, setIndex: 1 }),
+    ]
+    const h = buildHistory(w, s)
+    const second = h[0]!
+    expect(second.setCount).toBe(1)
+    expect(second.volumeKg).toBe(128)
+    expect(second.prs).toEqual([])
+    expect(second.maxPain).toBe(4)
+    expect(second.exercises[0]?.warmupCount).toBe(1)
+    expect(personalBests(s)[0]?.detail).toBe('16 kg × 8 op.')
+  })
+  it('tréning len s rozcvičovacími sériami sa v histórii nezobrazí', () => {
+    expect(buildHistory([workout(1, '2026-09-01')], [set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 5, warmup: true })])).toEqual([])
+  })
+  it('poznámky k sériám sa zoberú v poradí, prázdne sa vynechajú', () => {
+    const w = [workout(1, '2026-09-01')]
+    const s = [
+      set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 10, setIndex: 0, note: ' ľavá slabšia ' }),
+      set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 10, setIndex: 1 }),
+      set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 9, setIndex: 2, note: 'nový úchop' }),
+    ]
+    expect(buildHistory(w, s)[0]?.exercises[0]?.notes).toEqual(['ľavá slabšia', 'nový úchop'])
+  })
   it('rekordy sa držia zvlášť pre každý cvik', () => {
     const h = buildHistory(workouts.slice(0, 2), [
       set(1, '2026-09-01', 'goblet_squat', { weightKg: 16, reps: 8 }),
@@ -130,5 +158,15 @@ describe('osobné rekordy', () => {
     )
     expect(recentPrCount(h, '2026-09-14', 28)).toBe(1)
     expect(recentPrCount(h, '2026-09-14', 365)).toBe(2)
+  })
+})
+
+describe('recentPrCount cez hranicu mesiaca', () => {
+  it('okno 28 dní sa počíta v lokálnych dátumoch, nie cez UTC', () => {
+    const w = [workout(1, '2026-09-03'), workout(2, '2026-09-04')]
+    const s = [set(1, '2026-09-03', 'goblet_squat', { weightKg: 16, reps: 8 }), set(2, '2026-09-04', 'goblet_squat', { weightKg: 16, reps: 9 })]
+    const h = buildHistory(w, s)
+    expect(recentPrCount(h, '2026-10-02', 28)).toBe(1) // 2026-09-04 je presne 28 dní pred 2026-10-02
+    expect(recentPrCount(h, '2026-10-03', 28)).toBe(0)
   })
 })

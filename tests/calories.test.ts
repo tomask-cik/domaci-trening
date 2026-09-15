@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adaptCalorieTarget, calorieFloor, initialCalorieTarget, mifflinStJeor, round10, targetRateRange, tdeeEstimate } from '../src/domain/calories'
+import { adaptCalorieTarget, calorieFloor, dailyCalorieTarget, initialCalorieTarget, mifflinStJeor, round10, targetRateRange, tdeeEstimate } from '../src/domain/calories'
 
 describe('mifflinStJeor', () => {
   it('muž 105 kg, 180 cm, 35 r.', () => {
@@ -84,5 +84,20 @@ describe('adaptCalorieTarget so zapísaným príjmom', () => {
     // príjem 2300, strata 0,6 → výdaj 2960 → cieľ 2460 → z 2450 je +10
     const r = adaptCalorieTarget({ currentTarget: 2450, weightKg: 100, rateKgPerWeek: -0.6, bmr: 1950, tdee: 3000, avgIntakeKcal: 2300 })
     expect(r.delta).toBe(10)
+  })
+})
+
+describe('dailyCalorieTarget', () => {
+  const s = { sex: 'm' as const, heightCm: 180, age: 35, activityFactor: 1.4, calorieTarget: 2310 }
+  it('normálny týždeň = adaptívny cieľ', () => {
+    const t = dailyCalorieTarget(s, 105, false)
+    expect(t.kcal).toBe(2310)
+    expect(t.isMaintenance).toBe(false)
+  })
+  it('deload = udržiavacia úroveň z aktuálnej hmotnosti (PROGRAM.md 5)', () => {
+    const t = dailyCalorieTarget(s, 100, true)
+    expect(t.maintenanceKcal).toBe(tdeeEstimate(mifflinStJeor('m', 100, 180, 35), 1.4))
+    expect(t.kcal).toBe(t.maintenanceKcal)
+    expect(t.isMaintenance).toBe(true)
   })
 })

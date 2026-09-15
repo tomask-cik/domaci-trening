@@ -1,9 +1,28 @@
 import { MA_MIN_POINTS, MA_WINDOW_DAYS, PHASE_THRESHOLDS } from './constants'
 import { addDays } from './dates'
+import type { DayLog } from './types'
 
 export interface WeightPoint {
   date: string
   weightKg: number
+}
+
+/** Len dni so zapísanou hmotnosťou, v poradí, v akom prišli. */
+export function weightPoints(days: DayLog[]): WeightPoint[] {
+  return days.filter((d): d is DayLog & { weightKg: number } => typeof d.weightKg === 'number').map((d) => ({ date: d.date, weightKg: d.weightKg }))
+}
+
+/**
+ * „Aktuálna hmotnosť“ pre všetky výpočty v appke: 7-dňový priemer, keď existuje; inak posledné
+ * váženie; inak štartovacia hmotnosť. Jedno miesto namiesto troch kópií v obrazovkách –
+ * fáza, kalórie na deload aj podlaha musia vychádzať z toho istého čísla.
+ */
+export function currentWeightKg(days: DayLog[], today: string, fallbackKg: number): number {
+  const points = weightPoints(days)
+  const avg = movingAverage(points, today)
+  if (avg !== null) return avg
+  const last = [...points].sort((a, b) => (a.date < b.date ? -1 : 1)).at(-1)
+  return last?.weightKg ?? fallbackKg
 }
 
 function round1(x: number): number {

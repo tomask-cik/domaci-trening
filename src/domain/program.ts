@@ -8,7 +8,7 @@ import {
   REST_SMALL_SEC,
   SHORT_SESSION_MINUTES,
 } from './constants'
-import { getExercise, type MuscleGroup } from './exercises'
+import { EXERCISES, getExercise, type Exercise, type MuscleGroup } from './exercises'
 import type { TemplateId } from './types'
 
 export interface TemplateItem {
@@ -146,4 +146,32 @@ export function weekOrder(daysPerWeek: 2 | 3 | 4, startWith: TemplateId = 'A'): 
     cur = cur === 'A' ? 'B' : 'A'
   }
   return out
+}
+
+/**
+ * Výmena cviku v jednom tréningu (bolesť, obsadená hrazda, chuť). Náhrada preberá miesto,
+ * počet sérií aj pauzu pôvodného cviku; `label` (napr. podhmat) patrí len pôvodnému cviku.
+ * `swaps` sú uložené na tréningu, takže šablóna sa nemení a ďalší tréning je opäť podľa plánu.
+ */
+export function applySwaps(session: SessionItem[], swaps: Record<number, string> | undefined): (SessionItem & { originalExerciseId: string })[] {
+  return session.map((it) => {
+    const replacement = swaps?.[it.order]
+    if (!replacement || replacement === it.exerciseId) return { ...it, originalExerciseId: it.exerciseId }
+    const rest = { ...it, exerciseId: replacement, originalExerciseId: it.exerciseId }
+    delete rest.label
+    return rest
+  })
+}
+
+/**
+ * Čo sa dá dosadiť na miesto cviku: silové cviky a stred tela z knižnice, ktoré v tréningu
+ * ešte nie sú (dvakrát ten istý cvik by miešal série). Najprv cviky s rovnakou partiou.
+ */
+export function swapCandidates(session: SessionItem[], order: number): Exercise[] {
+  const current = session.find((it) => it.order === order)
+  if (!current) return []
+  const inUse = new Set(session.filter((it) => it.order !== order).map((it) => it.exerciseId))
+  const currentGroups = new Set(getExercise(current.exerciseId).groups ?? [])
+  const sameGroup = (e: Exercise) => (e.groups ?? []).some((g) => currentGroups.has(g))
+  return EXERCISES.filter((e) => e.category !== 'mobilita' && !inUse.has(e.id)).sort((a, b) => Number(sameGroup(b)) - Number(sameGroup(a)))
 }

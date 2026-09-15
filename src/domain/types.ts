@@ -11,6 +11,8 @@ export interface Settings {
   startWeightKg: number
   targetWeightKg: number
   bodyFatPct: number | null
+  /** Hmotnosť, pri ktorej sa % tuku meralo. Chýba = štartovacia (staršie nastavenia). */
+  bodyFatRefKg?: number
   kettlebells: number[]
   hasBand: boolean
   hasMat: boolean
@@ -29,6 +31,8 @@ export interface Settings {
   anthropicApiKey?: string
   /** ISO čas poslednej úspešnej zálohy. */
   lastBackupAt?: string
+  /** Názov Skratky (iOS), ktorá po tréningu doplní tep a energiu z hodiniek. */
+  healthShortcutName?: string
 }
 
 export interface RunLog {
@@ -78,6 +82,11 @@ export interface Workout {
   healthAvgHr?: number | null
   isDeload: boolean
   minutes: number
+  /**
+   * Výmeny cvikov v tomto tréningu: poradie v šablóne (SessionItem.order) → id náhradného cviku.
+   * Uložené pri tréningu, aby história vedela, čo sa naozaj cvičilo, a šablóna ostala nedotknutá.
+   */
+  swaps?: Record<number, string>
 }
 
 export interface SetLog {
@@ -91,6 +100,13 @@ export interface SetLog {
   seconds: number | null
   rpe: number
   pain: number | null
+  /** Voľná poznámka („ľavá strana slabšia“, „nový úchop“). */
+  note?: string
+  /**
+   * Rozcvičovacia séria: eviduje sa (váha, opakovania), ale neráta sa do progresie, rekordov,
+   * objemu ani do počtu sérií cviku. Chýbajúce = pracovná (staršie záznamy).
+   */
+  warmup?: boolean
 }
 
 export interface ExerciseState {

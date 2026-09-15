@@ -10,6 +10,7 @@
  *  - štádiá v opakovaniach (zhyby, dipy): opakovania
  */
 
+import { addDays } from './dates'
 import { EXERCISE_MAP } from './exercises'
 import { estimated1RM } from './progression'
 import type { SetLog, TemplateId, Workout } from './types'
@@ -30,26 +31,36 @@ export interface PersonalRecord {
 export interface ExerciseLine {
   exerciseId: string
   name: string
+  /** Pracovné série (rozcvičovacie zvlášť v `warmupCount`). */
   setCount: number
+  warmupCount: number
   /** Najlepšia séria tréningu, napr. „24 kg × 8 op.“ */
   best: string
   bestScore: number
   unit: ScoreUnit
   isPr: boolean
+  /** Neprázdne poznámky k sériám v poradí sérií. */
+  notes: string[]
 }
 
 export interface WorkoutSummary {
   workoutId: number
   date: string
   template: TemplateId
+  startedAt: string
+  finishedAt: string | undefined
   isDeload: boolean
+  /** Pracovné série; rozcvičovacie sa nerátajú. */
   setCount: number
-  /** Σ (váha × opakovania) – len cviky so záťažou. */
+  /** Σ (váha × opakovania) – len cviky so záťažou, len pracovné série. */
   volumeKg: number
   avgRpe: number | null
   maxPain: number
   exercises: ExerciseLine[]
   prs: PersonalRecord[]
+  /** Z hodiniek cez Skratky, ak prišlo. */
+  healthKcal: number | null
+  healthAvgHr: number | null
 }
 
 function unitFor(exerciseId: string): ScoreUnit {
@@ -97,8 +108,12 @@ export function buildHistory(workouts: Workout[], sets: SetLog[]): WorkoutSummar
 
   for (const w of order) {
     const id = w.id as number
-    const logged = (byWorkout.get(id) ?? []).sort((a, b) => a.setIndex - b.setIndex)
+    const all = (byWorkout.get(id) ?? []).sort((a, b) => a.setIndex - b.setIndex)
+    // Rozcvičovacie série: nič z nich sa neporovnáva ani nesčítava, len ich počet pri cviku.
+    const logged = all.filter((s) => !s.warmup)
     if (logged.length === 0) continue
+    const warmups = new Map<string, number>()
+    for (const s of all) if (s.warmup) warmups.set(s.exerciseId, (warmups.get(s.exerciseId) ?? 0) + 1)
 
     const perExercise = new Map<string, SetLog[]>()
     for (const s of logged) perExercise.set(s.exerciseId, [...(perExercise.get(s.exerciseId) ?? []), s])
@@ -136,10 +151,12 @@ export function buildHistory(workouts: Workout[], sets: SetLog[]): WorkoutSummar
         exerciseId,
         name: nameOf(exerciseId),
         setCount: exSets.length,
+        warmupCount: warmups.get(exerciseId) ?? 0,
         best: describeSet(top),
         bestScore: topScore,
         unit: unitFor(exerciseId),
         isPr,
+        notes: exSets.map((s) => s.note?.trim() ?? '').filter(Boolean),
       })
     }
 
@@ -148,13 +165,17 @@ export function buildHistory(workouts: Workout[], sets: SetLog[]): WorkoutSummar
       workoutId: id,
       date: w.date,
       template: w.template,
+      startedAt: w.startedAt,
+      finishedAt: w.finishedAt,
       isDeload: w.isDeload,
       setCount: logged.length,
       volumeKg: Math.round(volumeKg),
       avgRpe: rpes.length ? Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10 : null,
-      maxPain: Math.max(0, ...logged.map((s) => s.pain ?? 0)),
+      maxPain: Math.max(0, ...all.map((s) => s.pain ?? 0)),
       exercises: lines,
       prs,
+      healthKcal: typeof w.healthKcal === 'number' ? w.healthKcal : null,
+      healthAvgHr: typeof w.healthAvgHr === 'number' ? w.healthAvgHr : null,
     })
   }
 
@@ -174,6 +195,7 @@ export interface BestEntry {
 export function personalBests(sets: SetLog[]): BestEntry[] {
   const best = new Map<string, BestEntry>()
   for (const s of sets) {
+    if (s.warmup) continue
     const score = setScore(s.exerciseId, s)
     if (score <= 0) continue
     const cur = best.get(s.exerciseId)
@@ -193,8 +215,6 @@ export function personalBests(sets: SetLog[]): BestEntry[] {
 
 /** Koľko rekordov padlo za posledných `days` dní – malé povzbudenie na Dnes. */
 export function recentPrCount(history: WorkoutSummary[], today: string, days = 28): number {
-  const from = new Date(today)
-  from.setDate(from.getDate() - days)
-  const fromISO = from.toISOString().slice(0, 10)
+  const fromISO = addDays(today, -days)
   return history.filter((w) => w.date >= fromISO).reduce((n, w) => n + w.prs.length, 0)
 }

@@ -74,6 +74,19 @@ test('nastavenie → tréning → zápis sérií → návrh progresie → zápis
   await pullups.getByTestId('log-set').click()
   await page.getByTestId('timer-skip').click()
 
+  // Výmena cviku počas tréningu: kliky → tlak z podlahy (kým nie je zapísaná séria)
+  const pushups = page.locator('section', { hasText: 'Progresia kliku' }).first()
+  await pushups.getByTestId('swap-open').click()
+  await page.getByTestId('swap-kb_floor_press').click()
+  const floorPress = page.locator('section', { hasText: 'Tlak z podlahy s KB' }).first()
+  await expect(floorPress.getByText('náhrada za: Progresia kliku')).toBeVisible()
+  await expect(floorPress.getByText('16 kg × 8 op. / strana')).toBeVisible()
+  // Po zapísaní série sa už vymeniť nedá
+  await floorPress.getByTestId('rpe-8').click()
+  await floorPress.getByTestId('log-set').click()
+  await page.getByTestId('timer-skip').click()
+  await expect(floorPress.getByTestId('swap-open')).toHaveCount(0)
+
   // Ukončenie → návrh progresie
   await page.getByTestId('finish-workout').click()
   await expect(page.getByRole('heading', { name: 'Tréning hotový' })).toBeVisible()
@@ -81,6 +94,7 @@ test('nastavenie → tréning → zápis sérií → návrh progresie → zápis
   await expect(list).toContainText('Goblet drep')
   await expect(list).toContainText('nabudúce 7 op.')
   await expect(list).toContainText('Progresia zhybu')
+  await expect(list).toContainText('Tlak z podlahy s KB')
 
   await page.getByTestId('back-home').click()
 
@@ -158,6 +172,11 @@ test('appka funguje offline (service worker)', async ({ page, context }) => {
   await page.reload()
   await expect(page.getByTestId('start-workout')).toBeVisible()
   await page.getByTestId('weight-today').fill('103.9')
+  // Pole ukladá pri opustení (blur) alebo Enter; obnoviť až keď sa hodnota vráti z databázy.
+  await page.getByTestId('weight-today').press('Enter')
+  await page.getByTestId('steps-today').fill('5000')
+  await page.getByTestId('steps-today').press('Enter')
+  await expect(page.getByTestId('steps-today')).toHaveValue('5000')
   await page.reload()
   await expect(page.getByTestId('weight-today')).toHaveValue('103.9')
   await context.setOffline(false)

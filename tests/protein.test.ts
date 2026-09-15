@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { proteinTarget } from '../src/domain/protein'
+import { proteinFor, proteinTarget } from '../src/domain/protein'
 
 describe('proteinTarget', () => {
   it('bez % tuku: 2,0 g/kg cieľovej hmotnosti', () => {
@@ -34,5 +34,17 @@ describe('proteinTarget', () => {
     const naive = proteinTarget({ targetWeightKg: 85, referenceWeightKg: 95, bodyFatPct: 30 })
     expect(start.gramsPerDay).toBe(170)
     expect(naive.gramsPerDay).toBeLessThan(start.gramsPerDay)
+  })
+})
+
+describe('proteinFor', () => {
+  it('nové meranie tuku pri nižšej hmotnosti počíta čistú hmotu z tej hmotnosti', () => {
+    // 25 % pri 95 kg: FFM 71,25 × 2,3 = 163,9 → 165; zo 105 kg by vyšlo 181 → 180.
+    expect(proteinFor({ targetWeightKg: 85, startWeightKg: 105, bodyFatPct: 25, bodyFatRefKg: 95 }).gramsPerDay).toBe(165)
+    expect(proteinFor({ targetWeightKg: 85, startWeightKg: 105, bodyFatPct: 25 }).gramsPerDay).toBe(180)
+  })
+  it('berie cieľovú a štartovaciu hmotnosť z nastavení', () => {
+    expect(proteinFor({ targetWeightKg: 85, startWeightKg: 105, bodyFatPct: null }).gramsPerDay).toBe(170)
+    expect(proteinFor({ targetWeightKg: 85, startWeightKg: 105, bodyFatPct: 30 })).toEqual(proteinTarget({ targetWeightKg: 85, referenceWeightKg: 105, bodyFatPct: 30 }))
   })
 })

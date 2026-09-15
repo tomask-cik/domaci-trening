@@ -3,19 +3,21 @@ import { useNavigate } from 'react-router-dom'
 import { Banner, Button, Card, CardTitle, NumberField, Pill, Stat } from '../components/ui'
 import { RunCard } from '../components/RunCard'
 import { saveDay, sessionFor, startWorkout } from '../db/actions'
-import { mifflinStJeor, tdeeEstimate } from '../domain/calories'
+import { dailyCalorieTarget } from '../domain/calories'
 import { BREAK_INTERVAL_MIN } from '../domain/constants'
 import { dayOfWeekSk, formatSk, weekIndex } from '../domain/dates'
 import { getExercise } from '../domain/exercises'
 import { MICRO_BREAKS } from '../domain/mobility'
 import { planForToday } from '../domain/plan'
 import { estimateMinutes, TEMPLATE_NAMES } from '../domain/program'
-import { proteinTarget } from '../domain/protein'
+import { proteinFor } from '../domain/protein'
 import { stepGoalForWeek } from '../domain/steps'
 import type { Settings } from '../domain/types'
-import { movingAverage, PHASE_NAMES, phaseFor } from '../domain/weight'
+import { currentWeightKg, movingAverage, PHASE_NAMES, phaseFor, weightPoints } from '../domain/weight'
 import { useDay, useDays, useThisWeek, useToday, useWeekReviews, useWorkouts } from '../hooks/useAppData'
+import { BACKUP_MESSAGE, runBackup } from '../lib/backupFile'
 import { kcal, kg, num, signed, steps as fmtSteps } from '../lib/format'
+import { backupReminderDue, daysSinceBackup } from '../lib/storage'
 
 export default function Today({ settings }: { settings: Settings }) {
   const today = useToday()
@@ -30,19 +32,21 @@ export default function Today({ settings }: { settings: Settings }) {
   const workouts = useWorkouts()
   const reviews = useWeekReviews()
   const [showBreaks, setShowBreaks] = useState(false)
+  const [backupMsg, setBackupMsg] = useState<string | null>(null)
 
   if (!days || !workouts || !reviews || day === undefined) return <div className="text-muted">Načítavam…</div>
 
-  const points = days.filter((d): d is typeof d & { weightKg: number } => typeof d.weightKg === 'number').map((d) => ({ date: d.date, weightKg: d.weightKg }))
+  const points = weightPoints(days)
   const avg = movingAverage(points, today)
-  const current = avg ?? points[points.length - 1]?.weightKg ?? settings.startWeightKg
+  const current = currentWeightKg(days, today, settings.startWeightKg)
   const phase = phaseFor(current, settings.startWeightKg, settings.targetWeightKg)
-  const protein = proteinTarget({ targetWeightKg: settings.targetWeightKg, referenceWeightKg: settings.startWeightKg, bodyFatPct: settings.bodyFatPct })
+  const protein = proteinFor(settings)
   const plan = planForToday(settings, workouts, today)
   const session = sessionFor(settings, plan.template, plan.isDeload)
   // V deloade sa je na udržiavacej úrovni (PROGRAM.md 5, RESEARCH R11).
-  const maintenance = tdeeEstimate(mifflinStJeor(settings.sex, current, settings.heightCm, settings.age), settings.activityFactor)
-  const dayTarget = plan.isDeload ? maintenance : settings.calorieTarget
+  const target = dailyCalorieTarget(settings, current, plan.isDeload)
+  const maintenance = target.maintenanceKcal
+  const dayTarget = target.kcal
   const stepGoal = stepGoalForWeek(weekIndex(today, settings.programStartDate), settings.stepsStart, settings.stepsGoal)
   const lastReview = reviews[reviews.length - 1]
   const toGo = Math.max(0, Math.round((current - settings.targetWeightKg) * 10) / 10)
@@ -61,6 +65,27 @@ export default function Today({ settings }: { settings: Settings }) {
         </div>
         {plan.isDeload ? <Pill tone="warn">Deload</Pill> : <Pill tone="accent">{plan.doneThisWeek}/{settings.daysPerWeek} tréningy</Pill>}
       </header>
+
+      {backupReminderDue(settings.lastBackupAt, settings.programStartDate, today) ? (
+        <Banner tone="warn">
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              {settings.lastBackupAt
+                ? `Záloha má ${String(daysSinceBackup(settings.lastBackupAt))} dní. Dáta sú len v tomto telefóne.`
+                : 'Ešte bez zálohy. Dáta sú len v tomto telefóne.'}
+            </span>
+            <Button
+              variant="secondary"
+              className="shrink-0 px-3"
+              data-testid="backup-now"
+              onClick={() => void runBackup(today).then((o) => setBackupMsg(BACKUP_MESSAGE[o]))}
+            >
+              Zálohovať
+            </Button>
+          </div>
+        </Banner>
+      ) : null}
+      {backupMsg ? <Banner tone="good">{backupMsg}</Banner> : null}
 
       {plan.isDeload ? (
         <Banner tone="warn">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EXERCISES, EXERCISE_MAP } from '../src/domain/exercises'
-import { buildSession, estimateMinutes, nextTemplate, TEMPLATES, weeklyFrequency, weeklyVolume, weekOrder } from '../src/domain/program'
+import { applySwaps, buildSession, estimateMinutes, nextTemplate, swapCandidates, TEMPLATES, weeklyFrequency, weeklyVolume, weekOrder } from '../src/domain/program'
 import { expandRoutine, routineTotalSeconds } from '../src/domain/mobility'
 import { stepGoalForWeek, weeklySteps } from '../src/domain/steps'
 import { planForToday } from '../src/domain/plan'
@@ -49,6 +49,35 @@ describe('šablóny', () => {
     expect(nextTemplate(null)).toBe('A')
     expect(nextTemplate('A')).toBe('B')
     expect(nextTemplate('B')).toBe('A')
+  })
+})
+
+describe('výmena cviku v tréningu', () => {
+  const session = buildSession('B', 45, false)
+  it('náhrada preberá miesto, série a pauzu; label ostáva len pôvodnému', () => {
+    const pull = session.find((it) => it.exerciseId === 'pullup_prog')!
+    const out = applySwaps(session, { [pull.order]: 'kb_floor_press' })
+    const swapped = out.find((it) => it.order === pull.order)!
+    expect(swapped.exerciseId).toBe('kb_floor_press')
+    expect(swapped.originalExerciseId).toBe('pullup_prog')
+    expect(swapped.sets).toBe(pull.sets)
+    expect(swapped.restSec).toBe(pull.restSec)
+    expect(swapped.label).toBeUndefined()
+    expect(out.filter((it) => it.order !== pull.order).map((it) => it.exerciseId)).toEqual(session.filter((it) => it.order !== pull.order).map((it) => it.exerciseId))
+  })
+  it('bez výmen je sedenie nezmenené a každý cvik má originalExerciseId', () => {
+    const out = applySwaps(session, undefined)
+    expect(out.map((it) => it.exerciseId)).toEqual(session.map((it) => it.exerciseId))
+    expect(out.every((it) => it.originalExerciseId === it.exerciseId)).toBe(true)
+  })
+  it('kandidáti: bez mobility, bez cvikov už v tréningu, rovnaká partia prvá', () => {
+    const dip = session.find((it) => it.exerciseId === 'dip_prog')!
+    const c = swapCandidates(session, dip.order)
+    expect(c.some((e) => e.category === 'mobilita')).toBe(false)
+    expect(c.some((e) => e.id === 'kb_row')).toBe(false) // už v tréningu B
+    expect(c.some((e) => e.id === 'dip_prog')).toBe(true) // pôvodný cvik ostáva na výber (návrat)
+    expect(c[0]?.groups).toContain('hrudnik_triceps')
+    expect(swapCandidates(session, 99)).toEqual([])
   })
 })
 

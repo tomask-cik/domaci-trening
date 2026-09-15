@@ -9,12 +9,30 @@ export interface Backup {
   tables: Record<string, unknown[]>
 }
 
+/**
+ * Kľúče a iné tajomstvá, ktoré do zálohy nepatria. Záloha ide do iCloud Drive alebo do mailu –
+ * API kľúč tam nemá čo robiť, po obnove sa zadá znova.
+ */
+const SECRET_SETTINGS = ['anthropicApiKey'] as const
+
+export function stripSecrets<T extends Record<string, unknown>>(row: T): T {
+  const out = { ...row }
+  for (const k of SECRET_SETTINGS) delete out[k]
+  return out
+}
+
 export async function exportAll(database: TrainingDB, now: Date = new Date()): Promise<Backup> {
   const tables: Record<string, unknown[]> = {}
   for (const name of TABLE_NAMES) {
-    tables[name] = await database.table(name).toArray()
+    const rows = await database.table(name).toArray()
+    tables[name] = name === 'settings' ? rows.map((r) => stripSecrets(r as Record<string, unknown>)) : rows
   }
   return { app: 'domaci-trening', version: BACKUP_VERSION, exportedAt: now.toISOString(), tables }
+}
+
+/** Názov súboru zálohy – dátum v názve, aby sa v iCloude dali rozlíšiť. */
+export function backupFileName(todayISO: string): string {
+  return `domaci-trening-${todayISO}.json`
 }
 
 export function validateBackup(input: unknown): { ok: true; backup: Backup } | { ok: false; error: string } {

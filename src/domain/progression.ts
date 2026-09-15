@@ -353,3 +353,39 @@ export function estimated1RM(weightKg: number, reps: number): number {
   if (reps <= 0) return 0
   return Math.round(weightKg * (1 + reps / 30) * 10) / 10
 }
+
+export interface StateOverride {
+  weightKg?: number | null
+  targetReps?: number | null
+  variant?: number
+  stage?: number
+  target?: number | null
+}
+
+/**
+ * Ručná úprava plánu cviku (knižnica): človek vie, že zvládne štádium 4, a nechce sa k nemu
+ * preklikať cez šesť tréningov. Hodnoty sa orežú na rozsah cviku, série (streaky) sa vynulujú –
+ * nový bod štartu, žiadna história neúspechov.
+ */
+export function applyOverride(ex: Exercise, state: ExerciseState, o: StateOverride, today: string): ExerciseState {
+  const next: ExerciseState = { ...state, topStreak: 0, failStreak: 0, updatedAt: today, lastChange: 'Ručná úprava v knižnici.' }
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(v)))
+  if (o.weightKg !== undefined) next.weightKg = o.weightKg !== null && o.weightKg > 0 ? o.weightKg : null
+  if (ex.kind === 'load') {
+    const [lo, hi] = ex.range ?? [8, 12]
+    if (o.targetReps !== undefined) next.targetReps = o.targetReps === null ? lo : clamp(o.targetReps, lo, hi)
+    if (o.variant !== undefined) next.variant = clamp(o.variant, 0, Math.max(0, (ex.variants?.length ?? 1) - 1))
+  } else if (ex.kind === 'timed') {
+    const [lo, hi] = ex.timedRange ?? [20, 40]
+    if (o.target !== undefined) next.target = o.target === null ? lo : clamp(o.target, lo, hi)
+  } else {
+    const stages = ex.stages ?? []
+    if (o.stage !== undefined) {
+      next.stage = clamp(o.stage, 0, Math.max(0, stages.length - 1))
+      if (o.target === undefined) next.target = stages[next.stage]?.lo ?? null
+    }
+    const st = stages[next.stage]
+    if (o.target !== undefined && st) next.target = o.target === null ? st.lo : clamp(o.target, st.lo, st.hi)
+  }
+  return next
+}

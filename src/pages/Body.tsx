@@ -5,34 +5,32 @@ import { saveDay } from '../db/actions'
 import { db } from '../db/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addDays, todayISO, weekIndex, weekStart } from '../domain/dates'
-import { getExercise, KEY_EXERCISE_IDS } from '../domain/exercises'
-import { estimated1RM } from '../domain/progression'
+import { EXERCISES, getExercise } from '../domain/exercises'
+import { setScore } from '../domain/history'
 import { stepGoalForWeek, weeklySteps } from '../domain/steps'
 import type { Settings, SetLog } from '../domain/types'
-import { movingAverage, phaseBoundaries, PHASE_NAMES, phaseFor, trendSeries } from '../domain/weight'
+import { currentWeightKg, movingAverage, phaseBoundaries, PHASE_NAMES, phaseFor, trendSeries, weightPoints } from '../domain/weight'
 import { useDay, useDays } from '../hooks/useAppData'
 import { kg, num, steps as fmtSteps } from '../lib/format'
 
 const AXIS = { stroke: '#93a3c4', fontSize: 11 }
 const GRID = '#2b3a5c'
+const TOOLTIP = { background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }
 
 export default function Body({ settings }: { settings: Settings }) {
   const today = todayISO()
   const days = useDays()
   const day = useDay(today)
   const sets = useLiveQuery(() => db.sets.toArray(), [])
-  const [strengthId, setStrengthId] = useState<string>('goblet_squat')
+  const [strengthId, setStrengthId] = useState<string | null>(null)
 
-  const points = useMemo(
-    () => (days ?? []).filter((d): d is typeof d & { weightKg: number } => typeof d.weightKg === 'number').map((d) => ({ date: d.date, weightKg: d.weightKg })),
-    [days],
-  )
+  const points = useMemo(() => weightPoints(days ?? []), [days])
 
   if (!days || day === undefined || !sets) return <div className="text-muted">Načítavam…</div>
 
   const series = trendSeries(points).map((p) => ({ ...p, label: p.date.slice(5).replace('-', '.') }))
   const avg = movingAverage(points, today)
-  const current = avg ?? points[points.length - 1]?.weightKg ?? settings.startWeightKg
+  const current = currentWeightKg(days, today, settings.startWeightKg)
   const phase = phaseFor(current, settings.startWeightKg, settings.targetWeightKg)
   const [b1, b2] = phaseBoundaries(settings.startWeightKg, settings.targetWeightKg)
   const lost = Math.round((settings.startWeightKg - current) * 10) / 10
@@ -46,13 +44,12 @@ export default function Body({ settings }: { settings: Settings }) {
   })
   const weekSummary = weeklySteps(days, thisWeek, stepGoal)
 
-  const strengthEx = getExercise(strengthId)
-  const strengthSets = sets.filter((s: SetLog) => s.exerciseId === strengthId)
-  const strengthSeries = buildStrengthSeries(strengthSets, strengthEx.kind)
-  const pullupSeries = buildStrengthSeries(
-    sets.filter((s: SetLog) => s.exerciseId === 'pullup_prog'),
-    'stage',
-  )
+  // Na výber je každý cvik, ktorý má aspoň jednu zapísanú sériu – v poradí knižnice, kľúčové prvé.
+  const logged = new Set(sets.map((s: SetLog) => s.exerciseId))
+  const chartable = EXERCISES.filter((e) => e.category !== 'mobilita' && logged.has(e.id)).sort((a, b) => Number(b.key) - Number(a.key))
+  const selectedId = strengthId && logged.has(strengthId) ? strengthId : (chartable[0]?.id ?? null)
+  const strengthEx = selectedId ? getExercise(selectedId) : null
+  const strengthSeries = selectedId ? buildStrengthSeries(sets.filter((s: SetLog) => s.exerciseId === selectedId)) : []
 
   return (
     <div className="space-y-4">
@@ -73,6 +70,10 @@ export default function Body({ settings }: { settings: Settings }) {
           <NumberField label="Hmotnosť (kg)" value={day?.weightKg ?? null} onChange={(v) => void saveDay(today, { weightKg: v ?? undefined })} step={0.1} decimals={1} min={35} max={300} />
           <NumberField label="Kroky" value={day?.steps ?? null} onChange={(v) => void saveDay(today, { steps: v ?? undefined })} step={500} min={0} max={60000} />
         </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm text-muted">Zápis pre iný deň (zabudnuté váženie, kroky, spánok)</summary>
+          <DayEditor today={today} />
+        </details>
       </Card>
 
       <Card>
@@ -86,10 +87,7 @@ export default function Body({ settings }: { settings: Settings }) {
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={AXIS} minTickGap={24} />
                 <YAxis tick={AXIS} domain={['dataMin - 1', 'dataMax + 1']} />
-                <Tooltip
-                  contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }}
-                  formatter={(v: unknown, name: unknown) => [`${num(Number(v), 1)} kg`, name === 'kg' ? 'denne' : '7-dňový priemer'] as [string, string]}
-                />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown, name: unknown) => [`${num(Number(v), 1)} kg`, name === 'kg' ? 'denne' : '7-dňový priemer'] as [string, string]} />
                 <ReferenceLine y={settings.targetWeightKg} stroke="#34d399" strokeDasharray="4 4" />
                 <Line type="monotone" dataKey="kg" stroke="#93a3c4" dot={false} strokeWidth={1} />
                 <Line type="monotone" dataKey="avg" stroke="#38bdf8" dot={false} strokeWidth={2.5} connectNulls />
@@ -108,7 +106,7 @@ export default function Body({ settings }: { settings: Settings }) {
               <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
               <XAxis dataKey="label" tick={AXIS} />
               <YAxis tick={AXIS} />
-              <Tooltip contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }} formatter={(v: unknown) => [fmtSteps(Number(v)), 'priemer/deň'] as [string, string]} />
+              <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown) => [fmtSteps(Number(v)), 'priemer/deň'] as [string, string]} />
               <ReferenceLine y={stepGoal} stroke="#34d399" strokeDasharray="4 4" />
               <Bar dataKey="priemer" fill="#38bdf8" radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -118,20 +116,25 @@ export default function Body({ settings }: { settings: Settings }) {
       </Card>
 
       <Card>
-        <CardTitle>Sila v kľúčových cvikoch</CardTitle>
-        <select
-          value={strengthId}
-          onChange={(e) => setStrengthId(e.target.value)}
-          aria-label="Cvik"
-          className="tap mb-3 w-full rounded-xl border border-line bg-surface2 px-3 text-base"
-        >
-          {KEY_EXERCISE_IDS.map((id) => (
-            <option key={id} value={id} className="bg-surface">
-              {getExercise(id).name}
-            </option>
-          ))}
-        </select>
-        {strengthSeries.length < 2 ? (
+        <CardTitle right={<Pill>{chartable.length} cvikov</Pill>}>Sila v čase</CardTitle>
+        {chartable.length === 0 ? (
+          <p className="text-sm text-muted">Graf sa objaví po prvom tréningu so zapísanými sériami.</p>
+        ) : (
+          <select
+            value={selectedId ?? ''}
+            onChange={(e) => setStrengthId(e.target.value)}
+            aria-label="Cvik"
+            className="tap mb-3 w-full rounded-xl border border-line bg-surface2 px-3 text-base"
+          >
+            {chartable.map((e) => (
+              <option key={e.id} value={e.id} className="bg-surface">
+                {e.name}
+                {e.key ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        {!strengthEx ? null : strengthSeries.length < 2 ? (
           <p className="text-sm text-muted">Zapíš aspoň dva tréningy s týmto cvikom.</p>
         ) : (
           <div className="h-44">
@@ -140,54 +143,53 @@ export default function Body({ settings }: { settings: Settings }) {
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={AXIS} minTickGap={20} />
                 <YAxis tick={AXIS} />
-                <Tooltip
-                  contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }}
-                  formatter={(v: unknown) => [num(Number(v), 1), strengthEx.kind === 'load' ? 'odhad 1RM (kg)' : 'najlepšia séria'] as [string, string]}
-                />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown) => [num(Number(v), 1), strengthEx.kind === 'load' ? 'odhad 1RM (kg)' : 'najlepšia séria'] as [string, string]} />
                 <Line type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         )}
-        <p className="mt-2 text-xs text-muted">
-          {strengthEx.kind === 'load' ? 'Odhad 1RM (Epley) z najlepšej série tréningu – porovnáva rôzne kombinácie váhy a opakovaní.' : 'Najlepšia séria tréningu (opakovania alebo sekundy podľa štádia).'}
-        </p>
-      </Card>
-
-      <Card>
-        <CardTitle>Zhyby</CardTitle>
-        {pullupSeries.length < 2 ? (
-          <p className="text-sm text-muted">Zatiaľ málo dát.</p>
-        ) : (
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={pullupSeries} margin={{ top: 5, right: 8, bottom: 0, left: -18 }}>
-                <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={AXIS} minTickGap={20} />
-                <YAxis tick={AXIS} />
-                <Tooltip contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }} formatter={(v: unknown) => [num(Number(v), 0), 'najlepšia séria'] as [string, string]} />
-                <Line type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2.5} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        <p className="mt-2 text-xs text-muted">
-          Pri 105 kg je zhyb zdvíhanie 105 kg. Každý schudnutý kilogram je progres aj bez zmeny sily – preto tento graf čítaj spolu s hmotnosťou.
-        </p>
+        {strengthEx ? (
+          <p className="mt-2 text-xs text-muted">
+            {strengthEx.kind === 'load'
+              ? 'Odhad 1RM (Epley) z najlepšej série tréningu – porovnáva rôzne kombinácie váhy a opakovaní. Nad ~10 opakovaní je odhad hrubý.'
+              : strengthEx.kind === 'stage'
+                ? 'Najlepšia séria tréningu (opakovania alebo sekundy podľa štádia). Pri vlastnej váhe je každý schudnutý kilogram progres aj bez zmeny čísla – čítaj spolu s hmotnosťou.'
+                : 'Najlepšia séria tréningu v sekundách.'}
+          </p>
+        ) : null}
       </Card>
     </div>
   )
 }
 
-function buildStrengthSeries(sets: SetLog[], kind: 'load' | 'stage' | 'timed'): { label: string; value: number }[] {
+/** Doplnenie starších dní – 7-dňový priemer aj týždenné vyhodnotenie s nimi počítajú. */
+function DayEditor({ today }: { today: string }) {
+  const [date, setDate] = useState(addDays(today, -1))
+  const target = useDay(date)
+  return (
+    <div className="mt-3 space-y-4">
+      <label className="block">
+        <span className="mb-1 block text-sm text-muted">Deň</span>
+        <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Deň zápisu" className="tap w-full rounded-xl border border-line bg-surface2 px-3 text-base" />
+      </label>
+      {target === undefined ? null : (
+        <>
+          <NumberField label="Hmotnosť (kg)" value={target?.weightKg ?? null} onChange={(v) => void saveDay(date, { weightKg: v ?? undefined })} step={0.1} decimals={1} min={35} max={300} />
+          <NumberField label="Kroky" value={target?.steps ?? null} onChange={(v) => void saveDay(date, { steps: v ?? undefined })} step={500} min={0} max={60000} />
+          <NumberField label="Spánok (h)" value={target?.sleepH ?? null} onChange={(v) => void saveDay(date, { sleepH: v ?? undefined })} step={0.5} decimals={1} min={0} max={14} />
+        </>
+      )}
+      <p className="text-xs text-muted">Už vyhodnotené týždne sa spätne neprepočítavajú – doplnené dáta ovplyvnia až ďalšie vyhodnotenie a priemer.</p>
+    </div>
+  )
+}
+
+/** Najlepšia séria každého dňa – rovnaké skóre ako v Histórii (odhad 1RM / sekundy / opakovania). */
+function buildStrengthSeries(sets: SetLog[]): { label: string; value: number }[] {
   const byDate = new Map<string, number>()
   for (const s of sets) {
-    const value =
-      kind === 'load' && s.weightKg !== null && s.reps !== null
-        ? estimated1RM(s.weightKg, s.reps)
-        : s.seconds !== null
-          ? s.seconds
-          : (s.reps ?? 0)
+    const value = setScore(s.exerciseId, s)
     const cur = byDate.get(s.date) ?? 0
     if (value > cur) byDate.set(s.date, value)
   }
