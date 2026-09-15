@@ -1,9 +1,11 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { applyPendingReviews, ensureExerciseStates } from './db/actions'
+import { applyHealthImport, applyPendingReviews, ensureExerciseStates } from './db/actions'
 import { useSettings } from './hooks/useAppData'
 import { primeAudio } from './lib/sound'
 import { requestPersistentStorage } from './lib/storage'
+import { describeImport, parseHealthParams } from './domain/healthImport'
+import { todayISO } from './domain/dates'
 // Grafy (Recharts) sú najväčšia časť bundle – načítajú sa až pri otvorení záložky Telo.
 const Body = lazy(() => import('./pages/Body'))
 import Food from './pages/Food'
@@ -28,9 +30,25 @@ export default function App() {
   const settings = useSettings()
   const location = useLocation()
 
+  const [imported, setImported] = useState<string | null>(null)
+
   useEffect(() => {
     // Požiada prehliadač, aby IndexedDB nemazal (Safari inak vie úložisko vyhodiť).
     void requestPersistentStorage()
+  }, [])
+
+  useEffect(() => {
+    // Dáta z Apple Health prichádzajú od Skratky v adrese. Po zápise adresu vyčistíme,
+    // aby sa import nezopakoval pri obnovení stránky.
+    const found = parseHealthParams(window.location.search, todayISO())
+    if (!found) return
+    void applyHealthImport(found).then((ok) => {
+      setImported(ok ? describeImport(found) : 'Import sa netýkal žiadneho záznamu.')
+      const url = new URL(window.location.href)
+      url.search = ''
+      window.history.replaceState({}, '', url.toString())
+      setTimeout(() => setImported(null), 6000)
+    })
   }, [])
 
   useEffect(() => {
@@ -61,6 +79,9 @@ export default function App() {
   return (
     <div className="min-h-dvh">
       <main className={`safe-top safe-x mx-auto max-w-lg ${hideNav ? 'pb-6' : 'pb-32'}`}>
+        {imported ? (
+          <div className="mb-3 rounded-xl border border-good/50 bg-good/10 px-3 py-2 text-sm text-good">{imported}</div>
+        ) : null}
         <Routes>
           <Route path="/" element={<Navigate to="/dnes" replace />} />
           <Route path="/dnes" element={<Today settings={settings} />} />

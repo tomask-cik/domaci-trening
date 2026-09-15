@@ -34,10 +34,15 @@ export interface Settings {
 export interface RunLog {
   id?: number
   date: string
+  /** Chýba pri záznamoch spred podpory ostatných aktivít – tie sú behy. */
+  type?: 'run' | 'walk' | 'yoga' | 'strength' | 'other'
   meters: number
   seconds: number
-  /** Čistý výdaj navyše oproti pokoju. */
+  /** Čistý výdaj navyše oproti pokoju. Z Health je to aktívna energia. */
   kcal: number
+  /** Priemerný tep z hodiniek, ak je k dispozícii. */
+  avgHr?: number | null
+  source?: 'manual' | 'health'
   pain?: number | null
   note?: string
 }
@@ -68,6 +73,9 @@ export interface Workout {
   template: TemplateId
   startedAt: string
   finishedAt?: string
+  /** Doplnené z hodiniek cez Skratky. */
+  healthKcal?: number | null
+  healthAvgHr?: number | null
   isDeload: boolean
   minutes: number
 }

@@ -4,6 +4,7 @@ import { Button, Card, CardTitle, NumberField, Pill } from './ui'
 import { db } from '../db/db'
 import { addRun, deleteRun } from '../db/actions'
 import { formatDuration, formatPace, netKcal, paceSecPerKm, toSeconds, validRun } from '../domain/running'
+import { ACTIVITY_LABEL } from '../domain/healthImport'
 import { num } from '../lib/format'
 import type { RunLog } from '../domain/types'
 
@@ -16,6 +17,7 @@ export function RunCard({ date, weightKg }: { date: string; weightKg: number | n
   const [pain, setPain] = useState<number | null>(null)
 
   const list = runs ?? []
+  const labelOf = (r: RunLog) => ACTIVITY_LABEL[r.type ?? 'run']
   const totalKcal = list.reduce((n, r) => n + r.kcal, 0)
   const totalMeters = list.reduce((n, r) => n + r.meters, 0)
 
@@ -38,21 +40,24 @@ export function RunCard({ date, weightKg }: { date: string; weightKg: number | n
 
   return (
     <Card>
-      <CardTitle right={totalKcal > 0 ? <Pill tone="accent">{totalKcal} kcal</Pill> : <Pill>0</Pill>}>Beh</CardTitle>
+      <CardTitle right={totalKcal > 0 ? <Pill tone="accent">{totalKcal} kcal</Pill> : <Pill>0</Pill>}>Beh a pohyb</CardTitle>
 
       {list.length === 0 ? (
-        <p className="text-sm text-muted">Dnes bez behu.</p>
+        <p className="text-sm text-muted">Dnes bez zapísaného pohybu.</p>
       ) : (
         <ul className="mb-2 space-y-1">
           {list.map((r: RunLog) => (
             <li key={r.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface2 px-3 py-2">
               <span className="min-w-0">
                 <span className="block text-sm">
-                  {num(r.meters / 1000, 2)} km · {formatDuration(r.seconds)}
+                  {labelOf(r)}
+                  {r.meters > 0 ? ` · ${num(r.meters / 1000, 2)} km` : ''} · {formatDuration(r.seconds)}
+                  {r.source === 'health' ? ' ⌚️' : ''}
                 </span>
                 <span className="block text-xs text-muted">
-                  {formatPace(paceSecPerKm(r.meters, r.seconds))}
-                  {typeof r.pain === 'number' && r.pain > 0 ? ` · bolesť ${r.pain}` : ''}
+                  {r.meters > 0 ? `${formatPace(paceSecPerKm(r.meters, r.seconds))} · ` : ''}
+                  {typeof r.avgHr === 'number' ? `tep ${r.avgHr} · ` : ''}
+                  {typeof r.pain === 'number' && r.pain > 0 ? `bolesť ${r.pain}` : ''}
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2">

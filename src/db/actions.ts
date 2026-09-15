@@ -4,6 +4,7 @@ import { todayISO, weekStart } from '../domain/dates'
 import { startManualDeload } from '../domain/deload'
 import { EXERCISES, getExercise } from '../domain/exercises'
 import { dayTotals } from '../domain/food'
+import type { HealthImport } from '../domain/healthImport'
 import { isDeloadWeek } from '../domain/deload'
 import { buildSession } from '../domain/program'
 import { initialState, suggestNext, type ChangeKind } from '../domain/progression'
@@ -236,4 +237,31 @@ export async function addRun(entry: Omit<RunLog, 'id'>): Promise<void> {
 
 export async function deleteRun(id: number): Promise<void> {
   await db.runs.delete(id)
+}
+
+/**
+ * Zapíše, čo prišlo z Apple Health cez Skratky.
+ * Vracia false, keď sa zápis netýkal ničoho existujúceho (napr. neznámy tréning).
+ */
+export async function applyHealthImport(i: HealthImport): Promise<boolean> {
+  if (i.kind === 'steps') {
+    await saveDay(i.date, { steps: i.steps })
+    return true
+  }
+  if (i.kind === 'workout') {
+    const w = await db.workouts.get(i.workoutId)
+    if (!w) return false
+    await db.workouts.update(i.workoutId, { healthKcal: i.kcal, healthAvgHr: i.avgHr })
+    return true
+  }
+  await db.runs.add({
+    date: i.date,
+    type: i.type,
+    meters: i.meters,
+    seconds: i.seconds,
+    kcal: i.kcal ?? 0,
+    avgHr: i.avgHr,
+    source: 'health',
+  } as never)
+  return true
 }
