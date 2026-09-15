@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -73,6 +74,7 @@ export function NumberField({
   suffix,
   decimals = 0,
   testId,
+  placeholderValue,
 }: {
   label: string
   value: number | null
@@ -83,8 +85,34 @@ export function NumberField({
   suffix?: string
   decimals?: number
   testId?: string
+  /** Šedý návrh v prázdnom poli – napr. posledná zapísaná hmotnosť. +/− vychádza z neho. */
+  placeholderValue?: number | null
 }) {
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v * 10 ** decimals) / 10 ** decimals))
+
+  // Počas písania sa drží iba text. Orezanie na min/max až po opustení poľa –
+  // inak by sa „1“ na ceste k „105“ okamžite zmenilo na minimum a ďalej sa písať nedá.
+  const [draft, setDraft] = useState<string | null>(null)
+  const shown = draft ?? (value === null ? '' : String(value))
+
+  const commit = () => {
+    if (draft === null) return
+    const t = draft.trim().replace(',', '.')
+    setDraft(null)
+    if (t === '') {
+      onChange(null)
+      return
+    }
+    const n = Number(t)
+    onChange(Number.isFinite(n) ? clamp(n) : value)
+  }
+
+  const bump = (delta: number) => {
+    setDraft(null)
+    const base = draft !== null && draft.trim() !== '' ? Number(draft.replace(',', '.')) : (value ?? placeholderValue ?? 0)
+    onChange(clamp((Number.isFinite(base) ? base : 0) + delta))
+  }
+
   return (
     <label className="block">
       <span className="mb-1 block text-sm text-muted">{label}</span>
@@ -93,7 +121,7 @@ export function NumberField({
           type="button"
           aria-label={`${label} menej`}
           className="tap w-14 shrink-0 rounded-xl border border-line bg-surface2 text-2xl active:bg-line"
-          onClick={() => onChange(clamp((value ?? 0) - step))}
+          onClick={() => bump(-step)}
         >
           −
         </button>
@@ -103,15 +131,20 @@ export function NumberField({
           inputMode="decimal"
           type="number"
           step={step}
-          value={value ?? ''}
-          onChange={(e) => onChange(e.target.value === '' ? null : clamp(Number(e.target.value)))}
+          value={shown}
+          placeholder={placeholderValue !== undefined && placeholderValue !== null ? String(placeholderValue) : undefined}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
           className="tap min-w-0 flex-1 rounded-xl border border-line bg-surface2 px-3 text-center text-xl"
         />
         <button
           type="button"
           aria-label={`${label} viac`}
           className="tap w-14 shrink-0 rounded-xl border border-line bg-surface2 text-2xl active:bg-line"
-          onClick={() => onChange(clamp((value ?? 0) + step))}
+          onClick={() => bump(step)}
         >
           +
         </button>

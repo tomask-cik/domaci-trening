@@ -22,6 +22,10 @@ export default function Today({ settings }: { settings: Settings }) {
   const navigate = useNavigate()
   const days = useDays()
   const day = useDay(today)
+  // Posledné zapísané váženie – slúži ako východisko, nič sa samo neuloží.
+  const lastWeight = (days ?? [])
+    .filter((d) => typeof d.weightKg === 'number' && d.date < today)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))[0]
   const workouts = useWorkouts()
   const reviews = useWeekReviews()
   const [showBreaks, setShowBreaks] = useState(false)
@@ -91,13 +95,18 @@ export default function Today({ settings }: { settings: Settings }) {
         <NumberField
           label="Dnes (kg)"
           value={day?.weightKg ?? null}
+          placeholderValue={lastWeight?.weightKg ?? null}
           onChange={(v) => void saveDay(today, { weightKg: v ?? undefined })}
           step={0.1}
           decimals={1}
           min={35}
           max={300}
           testId="weight-today"
-          suffix="Váž sa ráno po WC, pred jedlom. Denné výkyvy ±1 kg sú voda."
+          suffix={
+            day?.weightKg === undefined && lastWeight
+              ? `Naposledy ${kg(lastWeight.weightKg as number)} (${formatSk(lastWeight.date)}). Váž sa ráno po WC, pred jedlom.`
+              : 'Váž sa ráno po WC, pred jedlom. Denné výkyvy ±1 kg sú voda.'
+          }
         />
       </Card>
 
