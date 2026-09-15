@@ -91,6 +91,8 @@ export interface SetLog {
   seconds: number | null
   rpe: number
   pain: number | null
+  /** Voľná poznámka („ľavá strana slabšia“, „nový úchop“). */
+  note?: string
 }
 
 export interface ExerciseState {

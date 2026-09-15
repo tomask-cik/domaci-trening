@@ -117,8 +117,23 @@ export async function logSet(entry: Omit<SetLog, 'id'>): Promise<number> {
   return (await db.sets.add(entry)) as number
 }
 
+/**
+ * Zmaže sériu a prečísluje zvyšné série toho istého cviku v tréningu na 0..n−1.
+ * Bez toho by po zmazaní série 2 z troch mal ďalší zápis index 2 a prepísal by tretiu.
+ */
 export async function deleteSet(id: number): Promise<void> {
-  await db.sets.delete(id)
+  await db.transaction('rw', db.sets, async () => {
+    const gone = await db.sets.get(id)
+    if (!gone) return
+    await db.sets.delete(id)
+    const rest = (await db.sets.where('workoutId').equals(gone.workoutId).filter((s) => s.exerciseId === gone.exerciseId).toArray()).sort(
+      (a, b) => a.setIndex - b.setIndex,
+    )
+    for (let i = 0; i < rest.length; i++) {
+      const s = rest[i] as SetLog
+      if (s.setIndex !== i) await db.sets.update(s.id as number, { setIndex: i })
+    }
+  })
 }
 
 export interface ProgressionResult {

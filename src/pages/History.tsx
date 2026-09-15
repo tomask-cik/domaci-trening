@@ -140,7 +140,7 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
           <p className="mb-2 text-xs text-muted">{TEMPLATE_NAMES[w.template]}</p>
           <ul className="space-y-1 text-sm">
             {w.exercises.map((e) => (
-              <li key={e.exerciseId} className="flex items-center justify-between gap-2">
+              <li key={e.exerciseId} className="flex flex-wrap items-center justify-between gap-x-2">
                 <span className="min-w-0 truncate">
                   {e.isPr ? '🏆 ' : ''}
                   {e.name}
@@ -148,6 +148,7 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
                 <span className={`shrink-0 ${e.isPr ? 'font-semibold text-good' : 'text-muted'}`}>
                   {e.setCount}× · {e.best}
                 </span>
+                {e.notes.length ? <span className="basis-full text-xs text-muted">✎ {e.notes.join(' · ')}</span> : null}
               </li>
             ))}
           </ul>

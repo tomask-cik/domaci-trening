@@ -37,6 +37,8 @@ export interface ExerciseLine {
   bestScore: number
   unit: ScoreUnit
   isPr: boolean
+  /** Neprázdne poznámky k sériám v poradí sérií. */
+  notes: string[]
 }
 
 export interface WorkoutSummary {
@@ -141,6 +143,7 @@ export function buildHistory(workouts: Workout[], sets: SetLog[]): WorkoutSummar
         bestScore: topScore,
         unit: unitFor(exerciseId),
         isPr,
+        notes: exSets.map((s) => s.note?.trim() ?? '').filter(Boolean),
       })
     }
 

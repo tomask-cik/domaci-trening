@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, CardTitle, Pill } from '../components/ui'
 import { useCountdown } from '../hooks/useCountdown'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { saveDay } from '../db/actions'
 import { todayISO } from '../domain/dates'
 import { expandRoutine, MOBILITY_ROUTINE, routineTotalSeconds } from '../domain/mobility'
@@ -16,6 +17,7 @@ export default function Mobility() {
 
   const current = index === null ? null : (steps[index] ?? null)
   const finished = index !== null && index >= steps.length
+  useWakeLock(current !== null)
 
   useEffect(() => {
     if (current) timer.start(current.seconds)

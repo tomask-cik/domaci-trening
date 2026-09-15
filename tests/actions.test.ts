@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   applyHealthImport,
   applyPendingReviews,
+  deleteSet,
   finishWorkout,
   logSet,
   saveDay,
@@ -83,6 +84,23 @@ describe('tréning', () => {
     expect(sets).toHaveLength(1)
     expect(sets[0]?.reps).toBe(7)
     expect(sets[0]?.rpe).toBe(9)
+  })
+  it('deleteSet prečísluje zvyšné série, takže ďalší zápis nič neprepíše', async () => {
+    const s = await freshSettings()
+    const wid = await startWorkout(s, 'A', TODAY)
+    const base = { workoutId: wid, date: TODAY, exerciseId: 'goblet_squat', weightKg: 16, seconds: null, rpe: 8, pain: null }
+    await logSet({ ...base, setIndex: 0, reps: 6 })
+    const mid = await logSet({ ...base, setIndex: 1, reps: 7 })
+    await logSet({ ...base, setIndex: 2, reps: 8 })
+    await logSet({ ...base, exerciseId: 'kb_rdl', setIndex: 0, reps: 10 }) // iný cvik ostane nedotknutý
+    await deleteSet(mid)
+    const squat = (await db.sets.where('workoutId').equals(wid).filter((x) => x.exerciseId === 'goblet_squat').toArray()).sort((a, b) => a.setIndex - b.setIndex)
+    expect(squat.map((x) => [x.setIndex, x.reps])).toEqual([[0, 6], [1, 8]])
+    await logSet({ ...base, setIndex: squat.length, reps: 9, note: 'posledná' })
+    const after = await db.sets.where('workoutId').equals(wid).filter((x) => x.exerciseId === 'goblet_squat').toArray()
+    expect(after.map((x) => x.reps).sort()).toEqual([6, 8, 9])
+    expect(after.find((x) => x.reps === 9)?.note).toBe('posledná')
+    expect((await db.sets.filter((x) => x.exerciseId === 'kb_rdl').toArray())[0]?.setIndex).toBe(0)
   })
   it('finishWorkout uloží finishedAt a prepočíta progresiu len pre cviky so sériami', async () => {
     const s = await freshSettings()

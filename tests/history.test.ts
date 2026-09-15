@@ -95,6 +95,15 @@ describe('história tréningov', () => {
     expect(h).toEqual([])
   })
 
+  it('poznámky k sériám sa zoberú v poradí, prázdne sa vynechajú', () => {
+    const w = [workout(1, '2026-09-01')]
+    const s = [
+      set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 10, setIndex: 0, note: ' ľavá slabšia ' }),
+      set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 10, setIndex: 1 }),
+      set(1, '2026-09-01', 'kb_row', { weightKg: 16, reps: 9, setIndex: 2, note: 'nový úchop' }),
+    ]
+    expect(buildHistory(w, s)[0]?.exercises[0]?.notes).toEqual(['ľavá slabšia', 'nový úchop'])
+  })
   it('rekordy sa držia zvlášť pre každý cvik', () => {
     const h = buildHistory(workouts.slice(0, 2), [
       set(1, '2026-09-01', 'goblet_squat', { weightKg: 16, reps: 8 }),

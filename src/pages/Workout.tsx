@@ -3,13 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { TimerBar } from '../components/Timer'
 import { useCountdown } from '../hooks/useCountdown'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { Banner, Button, Card, CardTitle, Pill } from '../components/ui'
 import { db } from '../db/db'
-import { discardWorkout, finishWorkout, logSet, type ProgressionResult } from '../db/actions'
-import { todayISO } from '../domain/dates'
+import { deleteSet, discardWorkout, finishWorkout, logSet, type ProgressionResult } from '../db/actions'
+import { formatSk, todayISO } from '../domain/dates'
 import { getExercise } from '../domain/exercises'
+import { describeSet } from '../domain/history'
 import { buildSession, TEMPLATE_NAMES, WARMUP } from '../domain/program'
-import { recommend } from '../domain/progression'
+import { nextHeavier, nextLighter, recommend } from '../domain/progression'
 import type { ExerciseState, Settings, SetLog } from '../domain/types'
 
 const RPE_OPTIONS = [6, 7, 8, 9, 10]
@@ -28,6 +30,9 @@ export default function Workout({ settings }: { settings: Settings }) {
   const states = useLiveQuery(() => db.exerciseStates.toArray(), [])
 
   const stateMap = useMemo(() => new Map((states ?? []).map((s: ExerciseState) => [s.exerciseId, s])), [states])
+
+  // Obrazovka nezhasne, kým tréning beží (telefón na zemi, pauzy 60–90 s).
+  useWakeLock(Boolean(workout) && !workout?.finishedAt && !results)
 
   useEffect(() => {
     if (workoutId && workout === null) void navigate('/dnes', { replace: true })
@@ -87,6 +92,35 @@ export default function Workout({ settings }: { settings: Settings }) {
     )
   }
 
+  // Ukončený tréning otvorený znova (napr. zo starej záložky): progresia už bola vyhodnotená,
+  // ďalšie série by sa do nej nedostali – preto len na čítanie.
+  if (workout.finishedAt) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-bold">{TEMPLATE_NAMES[workout.template]}</h1>
+        <Banner tone="info">Tento tréning ({formatSk(workout.date)}) je už ukončený a vyhodnotený. Zapísané série nájdeš v Histórii.</Banner>
+        <Card>
+          <CardTitle right={<Pill>{totalDone} sérií</Pill>}>Zapísané série</CardTitle>
+          <ul className="space-y-1 text-sm">
+            {session.map((item) => {
+              const logged = (setsByExercise.get(item.exerciseId) ?? []).sort((a, b) => a.setIndex - b.setIndex)
+              if (!logged.length) return null
+              return (
+                <li key={`${item.exerciseId}-${item.order}`} className="flex justify-between gap-2 rounded-lg bg-surface2 px-3 py-2">
+                  <span>{getExercise(item.exerciseId).name}</span>
+                  <span className="text-muted">{logged.map(describeSet).join(', ')}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
+        <Button className="w-full" onClick={() => navigate('/dnes')} data-testid="back-home">
+          Späť na dnešok
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <header className="flex items-start justify-between gap-3">
@@ -125,6 +159,7 @@ export default function Workout({ settings }: { settings: Settings }) {
             sets={item.sets}
             logged={logged}
             perSide={ex.perSide}
+            kettlebells={settings.kettlebells}
             onLog={async (setIndex, values) => {
               await logSet({
                 workoutId,
@@ -136,8 +171,13 @@ export default function Workout({ settings }: { settings: Settings }) {
                 seconds: values.seconds,
                 rpe: values.rpe,
                 pain: values.pain,
+                note: values.note || undefined,
               })
               timer.start(item.restSec)
+            }}
+            onDelete={async (s) => {
+              if (!confirm(`Zmazať sériu ${s.setIndex + 1} (${describeSet(s)})?`)) return
+              await deleteSet(s.id as number)
             }}
           />
         )
@@ -190,6 +230,52 @@ interface LogValues {
   seconds: number | null
   rpe: number
   pain: number | null
+  note: string
+}
+
+/**
+ * Pole s −/+ po bokoch: počas tréningu je klávesnica najhoršia možnosť (spotené ruky,
+ * jedna ruka, telefón na zemi). Písať sa dá stále, ale bežná zmena je jedno klepnutie.
+ */
+function Stepper({
+  label,
+  value,
+  onChange,
+  onDec,
+  onInc,
+  testId,
+  inputMode,
+}: {
+  label: string
+  value: number | null
+  onChange: (v: number | null) => void
+  onDec: () => void
+  onInc: () => void
+  testId: string
+  inputMode: 'decimal' | 'numeric'
+}) {
+  const btn = 'tap w-11 shrink-0 rounded-xl border border-line bg-bg text-xl active:bg-line'
+  return (
+    <label className="min-w-0 flex-1">
+      <span className="mb-1 block text-xs text-muted">{label}</span>
+      <div className="flex items-stretch gap-1">
+        <button type="button" aria-label={`${label} menej`} className={btn} onClick={onDec}>
+          −
+        </button>
+        <input
+          data-testid={testId}
+          type="number"
+          inputMode={inputMode}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          className="tap w-full min-w-0 rounded-xl border border-line bg-bg px-1 text-center text-lg"
+        />
+        <button type="button" aria-label={`${label} viac`} className={btn} onClick={onInc}>
+          +
+        </button>
+      </div>
+    </label>
+  )
 }
 
 function ExerciseCard({
@@ -199,7 +285,9 @@ function ExerciseCard({
   sets,
   logged,
   perSide,
+  kettlebells,
   onLog,
+  onDelete,
 }: {
   exerciseName: string
   label?: string
@@ -207,7 +295,9 @@ function ExerciseCard({
   sets: number
   logged: SetLog[]
   perSide: boolean
+  kettlebells: number[]
   onLog: (setIndex: number, values: LogValues) => Promise<void>
+  onDelete: (s: SetLog) => Promise<void>
 }) {
   const doneCount = logged.length
   const nextIndex = doneCount
@@ -215,7 +305,17 @@ function ExerciseCard({
   const [amount, setAmount] = useState<number | null>(rec.unit === 'sec' ? rec.targetSeconds : rec.targetReps)
   const [rpe, setRpe] = useState(8)
   const [pain, setPain] = useState<number | null>(null)
+  const [note, setNote] = useState('')
   const complete = doneCount >= sets
+  const amountStep = rec.unit === 'sec' ? 5 : 1
+
+  // Váha skáče po kettlebelloch, ktoré naozaj máš – medzi 16 a 24 nič iné neexistuje.
+  const stepWeight = (dir: -1 | 1) => {
+    const cur = weight ?? rec.weightKg ?? 0
+    const next = dir > 0 ? nextHeavier(kettlebells, cur) : nextLighter(kettlebells, cur)
+    if (next !== null) setWeight(next)
+  }
+  const stepAmount = (dir: -1 | 1) => setAmount(Math.max(0, (amount ?? 0) + dir * amountStep))
 
   return (
     <Card>
@@ -230,14 +330,27 @@ function ExerciseCard({
       {logged.length ? (
         <ul className="mt-3 space-y-1 text-sm">
           {logged.map((s) => (
-            <li key={s.id} className="flex justify-between rounded-lg bg-surface2 px-3 py-2">
-              <span>
-                Séria {s.setIndex + 1}: {s.weightKg !== null ? `${s.weightKg} kg × ` : ''}
-                {s.seconds !== null ? `${s.seconds} s` : `${s.reps ?? 0} op.`}
+            <li key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface2 py-1 pl-3 pr-1">
+              <span className="min-w-0">
+                <span className="block">
+                  Séria {s.setIndex + 1}: {s.weightKg !== null ? `${s.weightKg} kg × ` : ''}
+                  {s.seconds !== null ? `${s.seconds} s` : `${s.reps ?? 0} op.`}
+                </span>
+                {s.note ? <span className="block text-xs text-muted">✎ {s.note}</span> : null}
               </span>
-              <span className="text-muted">
-                RPE {s.rpe}
-                {s.pain ? ` · bolesť ${s.pain}` : ''}
+              <span className="flex shrink-0 items-center gap-2 text-muted">
+                <span>
+                  RPE {s.rpe}
+                  {s.pain ? ` · bolesť ${s.pain}` : ''}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Zmazať sériu ${s.setIndex + 1}`}
+                  onClick={() => void onDelete(s)}
+                  className="tap w-10 rounded-lg border border-line text-muted active:bg-line"
+                >
+                  ×
+                </button>
               </span>
             </li>
           ))}
@@ -248,29 +361,17 @@ function ExerciseCard({
         <div className="mt-4 space-y-3 rounded-xl border border-line bg-surface2 p-3">
           <div className="flex gap-2">
             {rec.weightKg !== null ? (
-              <label className="flex-1">
-                <span className="mb-1 block text-xs text-muted">Váha (kg)</span>
-                <input
-                  data-testid="set-weight"
-                  type="number"
-                  inputMode="decimal"
-                  value={weight ?? ''}
-                  onChange={(e) => setWeight(e.target.value === '' ? null : Number(e.target.value))}
-                  className="tap w-full rounded-xl border border-line bg-bg px-3 text-center text-lg"
-                />
-              </label>
+              <Stepper label="Váha (kg)" value={weight} onChange={setWeight} onDec={() => stepWeight(-1)} onInc={() => stepWeight(1)} testId="set-weight" inputMode="decimal" />
             ) : null}
-            <label className="flex-1">
-              <span className="mb-1 block text-xs text-muted">{rec.unit === 'sec' ? 'Sekundy' : 'Opakovania'}</span>
-              <input
-                data-testid="set-amount"
-                type="number"
-                inputMode="numeric"
-                value={amount ?? ''}
-                onChange={(e) => setAmount(e.target.value === '' ? null : Number(e.target.value))}
-                className="tap w-full rounded-xl border border-line bg-bg px-3 text-center text-lg"
-              />
-            </label>
+            <Stepper
+              label={rec.unit === 'sec' ? 'Sekundy' : 'Opakovania'}
+              value={amount}
+              onChange={setAmount}
+              onDec={() => stepAmount(-1)}
+              onInc={() => stepAmount(1)}
+              testId="set-amount"
+              inputMode="numeric"
+            />
           </div>
           <div>
             <span className="mb-1 block text-xs text-muted">RPE (10 = zlyhanie; cieľ 7–9)</span>
@@ -289,7 +390,7 @@ function ExerciseCard({
             </div>
           </div>
           <details>
-            <summary className="cursor-pointer text-xs text-muted">Bolesť (voliteľné)</summary>
+            <summary className="cursor-pointer text-xs text-muted">Bolesť a poznámka (voliteľné)</summary>
             <div className="mt-2 flex gap-1.5">
               {[0, 1, 2, 3, 4, 5, 6].map((p) => (
                 <button
@@ -303,19 +404,29 @@ function ExerciseCard({
               ))}
             </div>
             <p className="mt-1 text-xs text-muted">Nad 3/10 appka automaticky ustúpi o krok.</p>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Poznámka k sérii, napr. ľavá strana slabšia"
+              aria-label="Poznámka k sérii"
+              data-testid="set-note"
+              className="tap mt-2 w-full rounded-xl border border-line bg-bg px-3 text-sm"
+            />
           </details>
           <Button
             className="w-full"
             data-testid="log-set"
-            onClick={() =>
+            onClick={() => {
               void onLog(nextIndex, {
                 weightKg: rec.weightKg !== null ? weight : null,
                 reps: rec.unit === 'reps' ? amount : null,
                 seconds: rec.unit === 'sec' ? amount : null,
                 rpe,
                 pain,
+                note: note.trim(),
               })
-            }
+              setNote('')
+            }}
           >
             Zapísať sériu {nextIndex + 1}
           </Button>
