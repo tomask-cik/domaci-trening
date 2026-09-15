@@ -80,9 +80,15 @@ export async function getState(exerciseId: string, settings: Settings, today: st
   return fresh
 }
 
+/**
+ * Doplní polia dňa. Čítanie a zápis sú v jednej transakcii – dva rýchle zápisy po sebe
+ * (hmotnosť a hneď kroky) inak prečítajú ten istý starý riadok a druhý prepíše prvý.
+ */
 export async function saveDay(date: string, patch: Partial<DayLog>): Promise<void> {
-  const cur = (await db.days.get(date)) ?? { date }
-  await db.days.put({ ...cur, ...patch, date })
+  await db.transaction('rw', db.days, async () => {
+    const cur = (await db.days.get(date)) ?? { date }
+    await db.days.put({ ...cur, ...patch, date })
+  })
 }
 
 export async function startWorkout(settings: Settings, template: TemplateId, today = todayISO()): Promise<number> {

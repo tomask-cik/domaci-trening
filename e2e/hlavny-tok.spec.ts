@@ -158,6 +158,11 @@ test('appka funguje offline (service worker)', async ({ page, context }) => {
   await page.reload()
   await expect(page.getByTestId('start-workout')).toBeVisible()
   await page.getByTestId('weight-today').fill('103.9')
+  // Pole ukladá pri opustení (blur) alebo Enter; obnoviť až keď sa hodnota vráti z databázy.
+  await page.getByTestId('weight-today').press('Enter')
+  await page.getByTestId('steps-today').fill('5000')
+  await page.getByTestId('steps-today').press('Enter')
+  await expect(page.getByTestId('steps-today')).toHaveValue('5000')
   await page.reload()
   await expect(page.getByTestId('weight-today')).toHaveValue('103.9')
   await context.setOffline(false)
