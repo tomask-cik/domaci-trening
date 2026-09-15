@@ -50,7 +50,11 @@ export function proteinTarget(input: ProteinInput): ProteinResult {
   return { gramsPerDay, perMeal: Math.round(gramsPerDay / PROTEIN_MEALS), basis }
 }
 
-/** Cieľ bielkovín z nastavení – referenčná hmotnosť je štartovacia (pri nej sa meral tuk). */
-export function proteinFor(s: { targetWeightKg: number; startWeightKg: number; bodyFatPct: number | null }): ProteinResult {
-  return proteinTarget({ targetWeightKg: s.targetWeightKg, referenceWeightKg: s.startWeightKg, bodyFatPct: s.bodyFatPct })
+/**
+ * Cieľ bielkovín z nastavení. Referenčná hmotnosť je tá, pri ktorej sa % tuku meralo
+ * (`bodyFatRefKg`); pri starších nastaveniach štartovacia. Bez toho by nové meranie pri 95 kg
+ * počítalo čistú hmotu zo 105 kg.
+ */
+export function proteinFor(s: { targetWeightKg: number; startWeightKg: number; bodyFatPct: number | null; bodyFatRefKg?: number }): ProteinResult {
+  return proteinTarget({ targetWeightKg: s.targetWeightKg, referenceWeightKg: s.bodyFatRefKg ?? s.startWeightKg, bodyFatPct: s.bodyFatPct })
 }

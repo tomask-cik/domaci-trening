@@ -11,6 +11,8 @@ export interface Settings {
   startWeightKg: number
   targetWeightKg: number
   bodyFatPct: number | null
+  /** Hmotnosť, pri ktorej sa % tuku meralo. Chýba = štartovacia (staršie nastavenia). */
+  bodyFatRefKg?: number
   kettlebells: number[]
   hasBand: boolean
   hasMat: boolean

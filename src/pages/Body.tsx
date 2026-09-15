@@ -70,6 +70,10 @@ export default function Body({ settings }: { settings: Settings }) {
           <NumberField label="Hmotnosť (kg)" value={day?.weightKg ?? null} onChange={(v) => void saveDay(today, { weightKg: v ?? undefined })} step={0.1} decimals={1} min={35} max={300} />
           <NumberField label="Kroky" value={day?.steps ?? null} onChange={(v) => void saveDay(today, { steps: v ?? undefined })} step={500} min={0} max={60000} />
         </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm text-muted">Zápis pre iný deň (zabudnuté váženie, kroky, spánok)</summary>
+          <DayEditor today={today} />
+        </details>
       </Card>
 
       <Card>
@@ -155,6 +159,28 @@ export default function Body({ settings }: { settings: Settings }) {
           </p>
         ) : null}
       </Card>
+    </div>
+  )
+}
+
+/** Doplnenie starších dní – 7-dňový priemer aj týždenné vyhodnotenie s nimi počítajú. */
+function DayEditor({ today }: { today: string }) {
+  const [date, setDate] = useState(addDays(today, -1))
+  const target = useDay(date)
+  return (
+    <div className="mt-3 space-y-4">
+      <label className="block">
+        <span className="mb-1 block text-sm text-muted">Deň</span>
+        <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Deň zápisu" className="tap w-full rounded-xl border border-line bg-surface2 px-3 text-base" />
+      </label>
+      {target === undefined ? null : (
+        <>
+          <NumberField label="Hmotnosť (kg)" value={target?.weightKg ?? null} onChange={(v) => void saveDay(date, { weightKg: v ?? undefined })} step={0.1} decimals={1} min={35} max={300} />
+          <NumberField label="Kroky" value={target?.steps ?? null} onChange={(v) => void saveDay(date, { steps: v ?? undefined })} step={500} min={0} max={60000} />
+          <NumberField label="Spánok (h)" value={target?.sleepH ?? null} onChange={(v) => void saveDay(date, { sleepH: v ?? undefined })} step={0.5} decimals={1} min={0} max={14} />
+        </>
+      )}
+      <p className="text-xs text-muted">Už vyhodnotené týždne sa spätne neprepočítavajú – doplnené dáta ovplyvnia až ďalšie vyhodnotenie a priemer.</p>
     </div>
   )
 }

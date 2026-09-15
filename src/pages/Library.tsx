@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Card, Pill } from '../components/ui'
+import { Button, Card, NumberField, Pill } from '../components/ui'
+import { overrideExerciseState } from '../db/actions'
 import { EXERCISES, type Exercise } from '../domain/exercises'
 import { useExerciseStates } from '../hooks/useAppData'
-import type { Settings } from '../domain/types'
+import type { ExerciseState, Settings } from '../domain/types'
 import { recommend } from '../domain/progression'
 
 const CATEGORIES = [
@@ -103,11 +104,128 @@ export default function Library({ settings }: { settings: Settings }) {
                   {ex.startWeightKg && settings.kettlebells.length ? (
                     <p className="text-xs text-muted">Dostupné kettlebelly: {settings.kettlebells.join(', ')} kg.</p>
                   ) : null}
+                  {state ? <StateEditor ex={ex} state={state} settings={settings} /> : null}
                 </div>
               ) : null}
             </Card>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Ručná úprava plánu – keď vieš viac než algoritmus (zvládneš štádium 4, chceš začať s ťažším KB).
+ * Uloží sa až tlačidlom, streaky sa vynulujú (domain/progression.applyOverride).
+ */
+function StateEditor({ ex, state, settings }: { ex: Exercise; state: ExerciseState; settings: Settings }) {
+  const [open, setOpen] = useState(false)
+  const [weight, setWeight] = useState<number | null>(state.weightKg)
+  const [reps, setReps] = useState<number | null>(state.targetReps)
+  const [variant, setVariant] = useState(state.variant)
+  const [stage, setStage] = useState(state.stage)
+  const [target, setTarget] = useState<number | null>(state.target)
+  const [saved, setSaved] = useState(false)
+  const kbs = settings.kettlebells
+  const stages = ex.stages ?? []
+  const currentStage = stages[stage]
+
+  async function save() {
+    await overrideExerciseState(ex.id, { weightKg: weight, targetReps: reps, variant, stage, target }, settings)
+    setSaved(true)
+    setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <Button variant="ghost" className="w-full" onClick={() => setOpen(true)} data-testid={`edit-state-${ex.id}`}>
+          Upraviť plán cviku ručne
+        </Button>
+        {saved ? <p className="mt-1 text-center text-xs text-good">Uložené – ďalší tréning ide podľa toho.</p> : null}
+      </div>
+    )
+  }
+
+  const kbSelect = (value: number | null, onChange: (v: number | null) => void) => (
+    <label className="block">
+      <span className="mb-1 block text-sm text-muted">Kettlebell</span>
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} className="tap w-full rounded-xl border border-line bg-surface2 px-3 text-base">
+        <option value="" className="bg-surface">bez záťaže</option>
+        {kbs.map((k) => (
+          <option key={k} value={k} className="bg-surface">
+            {k} kg
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+
+  return (
+    <div className="space-y-3 rounded-xl border border-warn/40 bg-warn/5 p-3">
+      <p className="text-xs text-muted">Ručná úprava vynuluje počítadlá progresie. Ďalší tréning začne odtiaľto.</p>
+      {ex.kind === 'load' ? (
+        <>
+          {kbSelect(weight, setWeight)}
+          <NumberField label={`Cieľ opakovaní (${ex.range?.[0] ?? 8}–${ex.range?.[1] ?? 12})`} value={reps} onChange={setReps} min={ex.range?.[0] ?? 1} max={ex.range?.[1] ?? 30} />
+          {ex.variants && ex.variants.length > 1 ? (
+            <label className="block">
+              <span className="mb-1 block text-sm text-muted">Variant</span>
+              <select value={variant} onChange={(e) => setVariant(Number(e.target.value))} className="tap w-full rounded-xl border border-line bg-surface2 px-3 text-base">
+                {ex.variants.map((v, i) => (
+                  <option key={v} value={i} className="bg-surface">
+                    {i + 1}. {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </>
+      ) : ex.kind === 'timed' ? (
+        <>
+          {ex.startWeightKg ? kbSelect(weight, setWeight) : null}
+          <NumberField label={`Cieľ sekúnd (${ex.timedRange?.[0] ?? 20}–${ex.timedRange?.[1] ?? 40})`} value={target} onChange={setTarget} step={5} min={ex.timedRange?.[0] ?? 5} max={ex.timedRange?.[1] ?? 120} />
+        </>
+      ) : (
+        <>
+          <label className="block">
+            <span className="mb-1 block text-sm text-muted">Štádium</span>
+            <select
+              value={stage}
+              onChange={(e) => {
+                const s = Number(e.target.value)
+                setStage(s)
+                setTarget(stages[s]?.lo ?? null)
+              }}
+              className="tap w-full rounded-xl border border-line bg-surface2 px-3 text-base"
+            >
+              {stages.map((s, i) => (
+                <option key={s.name} value={i} className="bg-surface">
+                  {i + 1}. {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {currentStage ? (
+            <NumberField
+              label={`Cieľ (${currentStage.lo}–${currentStage.hi} ${currentStage.unit === 'sec' ? 's' : 'op.'})`}
+              value={target}
+              onChange={setTarget}
+              step={currentStage.unit === 'sec' ? 5 : 1}
+              min={currentStage.lo}
+              max={currentStage.hi}
+            />
+          ) : null}
+        </>
+      )}
+      <div className="flex gap-2">
+        <Button className="flex-1" onClick={() => void save()} data-testid={`save-state-${ex.id}`}>
+          Uložiť
+        </Button>
+        <Button variant="ghost" className="flex-1" onClick={() => setOpen(false)}>
+          Zrušiť
+        </Button>
       </div>
     </div>
   )

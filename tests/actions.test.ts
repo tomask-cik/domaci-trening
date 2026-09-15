@@ -6,6 +6,7 @@ import {
   deleteSet,
   finishWorkout,
   logSet,
+  overrideExerciseState,
   saveDay,
   saveSetup,
   setSwap,
@@ -150,6 +151,16 @@ describe('tréning', () => {
     const results = await finishWorkout(wid, deload, TODAY)
     expect(results[0]?.change).toBe('deload')
     expect((await db.exerciseStates.get('goblet_squat'))?.targetReps).toBe(6)
+  })
+})
+
+describe('ručná úprava stavu cviku', () => {
+  it('uloží štádium a cieľ, ďalší tréning ho použije', async () => {
+    const s = await freshSettings()
+    const next = await overrideExerciseState('pullup_prog', { stage: 3 }, s, TODAY)
+    expect(next.stage).toBe(3)
+    expect((await db.exerciseStates.get('pullup_prog'))?.target).toBe(4)
+    expect((await db.exerciseStates.get('pullup_prog'))?.lastChange).toContain('Ručná')
   })
 })
 

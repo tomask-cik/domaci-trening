@@ -7,7 +7,7 @@ import { dayTotals } from '../domain/food'
 import type { HealthImport } from '../domain/healthImport'
 import { isDeloadWeek } from '../domain/deload'
 import { buildSession } from '../domain/program'
-import { initialState, suggestNext, type ChangeKind } from '../domain/progression'
+import { applyOverride, initialState, suggestNext, type ChangeKind, type StateOverride } from '../domain/progression'
 import { computeWeeklyReview, pendingReviewWeeks } from '../domain/review'
 import type { DayLog, ExerciseState, FoodEntry, RunLog, Settings, SetLog, TemplateId } from '../domain/types'
 import { db } from './db'
@@ -171,6 +171,15 @@ export async function finishWorkout(workoutId: number, settings: Settings, today
   }
   await db.workouts.put({ ...workout, finishedAt: new Date().toISOString() })
   return results
+}
+
+/** Ručná úprava stavu cviku z knižnice (štádium, váha, cieľ, variant). */
+export async function overrideExerciseState(exerciseId: string, patch: StateOverride, settings: Settings, today = todayISO()): Promise<ExerciseState> {
+  const ex = getExercise(exerciseId)
+  const cur = await getState(exerciseId, settings, today)
+  const next = applyOverride(ex, cur, patch, today)
+  await db.exerciseStates.put(next)
+  return next
 }
 
 /** Vymení cvik na pozícii `order` v tréningu; `null` vráti pôvodný. Len kým k pozícii nie sú zapísané série. */

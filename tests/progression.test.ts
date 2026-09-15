@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getExercise } from '../src/domain/exercises'
-import { estimated1RM, initialState, nextHeavier, nextLighter, pickStartWeight, recommend, suggestNext } from '../src/domain/progression'
+import { applyOverride, estimated1RM, initialState, nextHeavier, nextLighter, pickStartWeight, recommend, suggestNext } from '../src/domain/progression'
 
 const kbs = [12, 16, 24]
 const ctx = { kettlebells: kbs, isDeload: false, today: '2026-09-07' }
@@ -178,6 +178,44 @@ describe('výdrže so záťažou (carry)', () => {
     expect(top.change).toBe('up_weight')
     expect(top.state.weightKg).toBe(24)
     expect(top.state.target).toBe(30)
+  })
+})
+
+describe('ručná úprava stavu (applyOverride)', () => {
+  const squat = getExercise('goblet_squat')
+  const pull = getExercise('pullup_prog')
+  const carry = getExercise('suitcase_carry')
+  const base = initialState(squat, [12, 16, 24], '2026-09-15')
+  it('load: váha, cieľ v rozsahu, variant v rozsahu, streaky na nulu', () => {
+    const s = applyOverride(squat, { ...base, failStreak: 1, topStreak: 1 }, { weightKg: 24, targetReps: 99, variant: 7 }, '2026-09-16')
+    expect(s.weightKg).toBe(24)
+    expect(s.targetReps).toBe(15)
+    expect(s.variant).toBe(2)
+    expect(s.failStreak).toBe(0)
+    expect(s.topStreak).toBe(0)
+    expect(s.updatedAt).toBe('2026-09-16')
+    expect(applyOverride(squat, base, { targetReps: 2 }, 'd').targetReps).toBe(6)
+    expect(applyOverride(squat, base, { weightKg: null }, 'd').weightKg).toBeNull()
+  })
+  it('stage: štádium v rozsahu, cieľ = lo nového štádia, alebo zadaný v rozsahu', () => {
+    const st = initialState(pull, [], 'd')
+    const up = applyOverride(pull, st, { stage: 3 }, 'd')
+    expect(up.stage).toBe(3)
+    expect(up.target).toBe(4)
+    expect(applyOverride(pull, st, { stage: 3, target: 20 }, 'd').target).toBe(8)
+    expect(applyOverride(pull, st, { stage: 99 }, 'd').stage).toBe(5)
+  })
+  it('timed: cieľ sekúnd v rozsahu, váha po KB', () => {
+    const st = initialState(carry, [12, 16, 24], 'd')
+    const o = applyOverride(carry, st, { target: 100, weightKg: 16 }, 'd')
+    expect(o.target).toBe(45)
+    expect(o.weightKg).toBe(16)
+  })
+  it('bez zmien vráti ten istý plán, len s vynulovanými streakmi', () => {
+    const o = applyOverride(squat, { ...base, failStreak: 1 }, {}, 'd')
+    expect(o.weightKg).toBe(base.weightKg)
+    expect(o.targetReps).toBe(base.targetReps)
+    expect(o.failStreak).toBe(0)
   })
 })
 

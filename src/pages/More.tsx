@@ -164,6 +164,18 @@ export default function More({ settings }: { settings: Settings }) {
           </div>
           <NumberField label="Cieľ krokov" value={settings.stepsGoal} onChange={(v) => void updateSettings({ stepsGoal: v ?? 9000 })} step={500} min={2000} max={25000} />
           <NumberField label="Cieľová hmotnosť (kg)" value={settings.targetWeightKg} onChange={(v) => void updateSettings({ targetWeightKg: v ?? 85 })} step={0.5} decimals={1} min={40} max={200} />
+          <NumberField
+            label="Telesný tuk (%) – ak si ho premeral"
+            value={settings.bodyFatPct}
+            onChange={(v) => void updateSettings({ bodyFatPct: v ?? null, bodyFatRefKg: v === null ? undefined : current })}
+            min={0}
+            max={70}
+            suffix={
+              settings.bodyFatPct !== null
+                ? `Meranie pri ${kg(settings.bodyFatRefKg ?? settings.startWeightKg)} – bielkoviny sa počítajú z čistej hmoty pri tejto hmotnosti.`
+                : 'Prázdne = bielkoviny 2,0 g/kg cieľovej hmotnosti. Po zadaní sa uloží aj aktuálna hmotnosť ako referencia.'
+            }
+          />
         </div>
       </Card>
 
