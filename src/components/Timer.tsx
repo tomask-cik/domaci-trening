@@ -19,7 +19,7 @@ export function TimerBar({
   if (!running) return null
   const pct = total > 0 ? Math.max(0, Math.min(100, (left / total) * 100)) : 0
   return (
-    <div className="fixed inset-x-0 bottom-[4.5rem] z-20 mx-auto max-w-lg px-3">
+    <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-20 mx-auto max-w-lg px-3">
       <div className="card overflow-hidden p-3 shadow-lg shadow-black/40">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm text-muted">{label}</span>

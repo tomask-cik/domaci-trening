@@ -5,7 +5,7 @@ import { saveDay } from '../db/actions'
 import { db } from '../db/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addDays, todayISO, weekIndex, weekStart } from '../domain/dates'
-import { getExercise, KEY_EXERCISE_IDS } from '../domain/exercises'
+import { EXERCISES, getExercise } from '../domain/exercises'
 import { setScore } from '../domain/history'
 import { stepGoalForWeek, weeklySteps } from '../domain/steps'
 import type { Settings, SetLog } from '../domain/types'
@@ -22,7 +22,7 @@ export default function Body({ settings }: { settings: Settings }) {
   const days = useDays()
   const day = useDay(today)
   const sets = useLiveQuery(() => db.sets.toArray(), [])
-  const [strengthId, setStrengthId] = useState<string>('goblet_squat')
+  const [strengthId, setStrengthId] = useState<string | null>(null)
 
   const points = useMemo(() => weightPoints(days ?? []), [days])
 
@@ -44,10 +44,12 @@ export default function Body({ settings }: { settings: Settings }) {
   })
   const weekSummary = weeklySteps(days, thisWeek, stepGoal)
 
-  const strengthEx = getExercise(strengthId)
-  const strengthSets = sets.filter((s: SetLog) => s.exerciseId === strengthId)
-  const strengthSeries = buildStrengthSeries(strengthSets)
-  const pullupSeries = buildStrengthSeries(sets.filter((s: SetLog) => s.exerciseId === 'pullup_prog'))
+  // Na výber je každý cvik, ktorý má aspoň jednu zapísanú sériu – v poradí knižnice, kľúčové prvé.
+  const logged = new Set(sets.map((s: SetLog) => s.exerciseId))
+  const chartable = EXERCISES.filter((e) => e.category !== 'mobilita' && logged.has(e.id)).sort((a, b) => Number(b.key) - Number(a.key))
+  const selectedId = strengthId && logged.has(strengthId) ? strengthId : (chartable[0]?.id ?? null)
+  const strengthEx = selectedId ? getExercise(selectedId) : null
+  const strengthSeries = selectedId ? buildStrengthSeries(sets.filter((s: SetLog) => s.exerciseId === selectedId)) : []
 
   return (
     <div className="space-y-4">
@@ -110,20 +112,25 @@ export default function Body({ settings }: { settings: Settings }) {
       </Card>
 
       <Card>
-        <CardTitle>Sila v kľúčových cvikoch</CardTitle>
-        <select
-          value={strengthId}
-          onChange={(e) => setStrengthId(e.target.value)}
-          aria-label="Cvik"
-          className="tap mb-3 w-full rounded-xl border border-line bg-surface2 px-3 text-base"
-        >
-          {KEY_EXERCISE_IDS.map((id) => (
-            <option key={id} value={id} className="bg-surface">
-              {getExercise(id).name}
-            </option>
-          ))}
-        </select>
-        {strengthSeries.length < 2 ? (
+        <CardTitle right={<Pill>{chartable.length} cvikov</Pill>}>Sila v čase</CardTitle>
+        {chartable.length === 0 ? (
+          <p className="text-sm text-muted">Graf sa objaví po prvom tréningu so zapísanými sériami.</p>
+        ) : (
+          <select
+            value={selectedId ?? ''}
+            onChange={(e) => setStrengthId(e.target.value)}
+            aria-label="Cvik"
+            className="tap mb-3 w-full rounded-xl border border-line bg-surface2 px-3 text-base"
+          >
+            {chartable.map((e) => (
+              <option key={e.id} value={e.id} className="bg-surface">
+                {e.name}
+                {e.key ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        {!strengthEx ? null : strengthSeries.length < 2 ? (
           <p className="text-sm text-muted">Zapíš aspoň dva tréningy s týmto cvikom.</p>
         ) : (
           <div className="h-44">
@@ -138,31 +145,15 @@ export default function Body({ settings }: { settings: Settings }) {
             </ResponsiveContainer>
           </div>
         )}
-        <p className="mt-2 text-xs text-muted">
-          {strengthEx.kind === 'load' ? 'Odhad 1RM (Epley) z najlepšej série tréningu – porovnáva rôzne kombinácie váhy a opakovaní.' : 'Najlepšia séria tréningu (opakovania alebo sekundy podľa štádia).'}
-        </p>
-      </Card>
-
-      <Card>
-        <CardTitle>Zhyby</CardTitle>
-        {pullupSeries.length < 2 ? (
-          <p className="text-sm text-muted">Zatiaľ málo dát.</p>
-        ) : (
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={pullupSeries} margin={{ top: 5, right: 8, bottom: 0, left: -18 }}>
-                <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={AXIS} minTickGap={20} />
-                <YAxis tick={AXIS} />
-                <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown) => [num(Number(v), 0), 'najlepšia séria'] as [string, string]} />
-                <Line type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2.5} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        <p className="mt-2 text-xs text-muted">
-          Pri 105 kg je zhyb zdvíhanie 105 kg. Každý schudnutý kilogram je progres aj bez zmeny sily – preto tento graf čítaj spolu s hmotnosťou.
-        </p>
+        {strengthEx ? (
+          <p className="mt-2 text-xs text-muted">
+            {strengthEx.kind === 'load'
+              ? 'Odhad 1RM (Epley) z najlepšej série tréningu – porovnáva rôzne kombinácie váhy a opakovaní. Nad ~10 opakovaní je odhad hrubý.'
+              : strengthEx.kind === 'stage'
+                ? 'Najlepšia séria tréningu (opakovania alebo sekundy podľa štádia). Pri vlastnej váhe je každý schudnutý kilogram progres aj bez zmeny čísla – čítaj spolu s hmotnosťou.'
+                : 'Najlepšia séria tréningu v sekundách.'}
+          </p>
+        ) : null}
       </Card>
     </div>
   )

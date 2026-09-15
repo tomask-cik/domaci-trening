@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Card, CardTitle, Pill, Stat } from '../components/ui'
 import { db } from '../db/db'
+import { actualWeeklyVolume, adherence, plannedWeeklyVolume, volumeLines } from '../domain/analytics'
 import { buildHistory, personalBests, recentPrCount, type WorkoutSummary } from '../domain/history'
-import { addDays, dayOfWeekSk, formatSk, todayISO } from '../domain/dates'
+import { addDays, dayOfWeekSk, formatSk, todayISO, weekStart } from '../domain/dates'
+import { MUSCLE_GROUP_LABEL } from '../domain/exercises'
 import { TEMPLATE_NAMES } from '../domain/program'
 import { num } from '../lib/format'
 import { buildWeekContext, WEEK_SYSTEM } from '../domain/summary'
@@ -32,6 +34,9 @@ export default function History({ settings }: { settings: Settings }) {
   const today = todayISO()
   const prs28 = recentPrCount(history, today)
   const totalVolume = history.reduce((n, w) => n + w.volumeKg, 0)
+  const thisWeek = weekStart(today)
+  const volume = volumeLines(actualWeeklyVolume(sets as SetLog[], thisWeek), plannedWeeklyVolume(settings, workouts as Workout[], thisWeek))
+  const adh = adherence(settings, workouts as Workout[], today)
 
   if (history.length === 0) {
     return (
@@ -55,6 +60,59 @@ export default function History({ settings }: { settings: Settings }) {
         <Stat label="Rekordy 28 dní" value={prs28} tone={prs28 > 0 ? 'good' : 'ink'} />
         <Stat label="Nazdvíhané" value={`${num(Math.round(totalVolume / 1000), 1)} t`} sub="váha × opakovania" />
       </div>
+
+      <Card>
+        <CardTitle right={<Pill tone={adh.thisWeek.done >= adh.thisWeek.planned ? 'good' : 'muted'}>{adh.thisWeek.done}/{adh.thisWeek.planned} tréningov</Pill>}>
+          Objem tento týždeň
+        </CardTitle>
+        <ul className="space-y-2" data-testid="volume-lines">
+          {volume.map((l) => {
+            const pct = l.planned > 0 ? Math.min(100, Math.round((l.done / l.planned) * 100)) : 0
+            return (
+              <li key={l.group} className="text-sm">
+                <div className="flex justify-between">
+                  <span>{MUSCLE_GROUP_LABEL[l.group]}</span>
+                  <span className={l.done >= l.planned && l.planned > 0 ? 'text-good' : 'text-muted'}>
+                    {l.done}/{l.planned} sérií
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2">
+                  <div className={`h-full rounded-full ${pct >= 100 ? 'bg-good' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+        <p className="mt-2 text-xs text-muted">
+          Odcvičené pracovné série na partiu oproti plánu šablón (pondelok–nedeľa). Pri chudnutí je toto hlavný znak, že objem na udržanie svalov nie je len na papieri (RESEARCH R3).
+        </p>
+      </Card>
+
+      <Card>
+        <CardTitle right={adh.pct !== null ? <Pill tone={adh.pct >= 80 ? 'good' : adh.pct >= 60 ? 'warn' : 'muted'}>{adh.pct} %</Pill> : undefined}>Dodržiavanie plánu</CardTitle>
+        {adh.weeks.length === 0 ? (
+          <p className="text-sm text-muted">Prvý uzavretý týždeň príde v pondelok. Zatiaľ tento týždeň {adh.thisWeek.done}/{adh.thisWeek.planned}.</p>
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              {adh.doneTotal} z {adh.plannedTotal} plánovaných tréningov za {adh.weeks.length} {adh.weeks.length === 1 ? 'týždeň' : adh.weeks.length < 5 ? 'týždne' : 'týždňov'}.
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {adh.weeks.slice(-12).map((w) => (
+                <li
+                  key={w.weekStart}
+                  title={`Týždeň od ${formatSk(w.weekStart)}`}
+                  className={`rounded-lg px-2 py-1 text-xs ${w.done >= w.planned ? 'bg-good/15 text-good' : w.done > 0 ? 'bg-warn/15 text-warn' : 'bg-surface2 text-muted'}`}
+                >
+                  {w.weekStart.slice(5).replace('-', '.')} · {w.done}/{w.planned}
+                  {w.deload ? ' D' : ''}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">Ukončené silové tréningy z plánovaného počtu dní za týždeň (D = deload). Bežiaci týždeň sa do percenta neráta.</p>
+          </>
+        )}
+      </Card>
 
       <Card>
         <CardTitle right={<Pill>{bests.length} cvikov</Pill>}>Osobné rekordy</CardTitle>
