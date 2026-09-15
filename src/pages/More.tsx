@@ -15,6 +15,7 @@ import { kcal, kg, signed } from '../lib/format'
 import { BACKUP_MESSAGE, runBackup } from '../lib/backupFile'
 import { backupOverdue, daysSinceBackup, isStoragePersisted } from '../lib/storage'
 import { hasApiKey } from '../lib/claude'
+import { DEFAULT_SHORTCUT_NAME, hasShortcutName } from '../domain/healthShortcut'
 
 export default function More({ settings }: { settings: Settings }) {
   const today = todayISO()
@@ -25,6 +26,7 @@ export default function More({ settings }: { settings: Settings }) {
   const [error, setError] = useState<string | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [keyDraft, setKeyDraft] = useState('')
+  const [shortcutDraft, setShortcutDraft] = useState<string | null>(null)
 
   useEffect(() => {
     void isStoragePersisted().then(setPersisted)
@@ -281,6 +283,41 @@ export default function More({ settings }: { settings: Settings }) {
         </div>
         <p className="mt-2 text-xs text-muted">
           Odhady sú orientačné – vychádzajú z typických hodnôt, nie z obalu tvojho konkrétneho výrobku. Pri baleniach je presnejšie opísať údaj z etikety.
+        </p>
+      </Card>
+
+      <Card>
+        <CardTitle right={hasShortcutName(settings.healthShortcutName) ? <Pill tone="good">nastavené</Pill> : <Pill>chýba</Pill>}>Apple Health (Skratky)</CardTitle>
+        <p className="mb-2 text-sm text-muted">
+          Po tréningu appka spustí Skratku s ID tréningu a oknom štart–koniec; Skratka prečíta z Health aktívnu energiu a priemerný tep a vráti ich
+          do appky. Návod na vytvorenie Skratky je v README (sekcia Apple Health). Sem napíš jej presný názov.
+        </p>
+        <div className="flex gap-2">
+          <input
+            value={shortcutDraft ?? settings.healthShortcutName ?? ''}
+            onChange={(e) => setShortcutDraft(e.target.value)}
+            placeholder={DEFAULT_SHORTCUT_NAME}
+            aria-label="Názov Skratky"
+            data-testid="shortcut-name"
+            className="tap min-w-0 flex-1 rounded-xl border border-line bg-surface2 px-3 text-base"
+          />
+          <Button
+            variant="secondary"
+            className="px-3"
+            disabled={shortcutDraft === null}
+            onClick={() => {
+              const v = (shortcutDraft ?? '').trim()
+              void updateSettings({ healthShortcutName: v || undefined })
+              setShortcutDraft(null)
+              setMessage(v ? `Skratka „${v}“ uložená.` : 'Názov Skratky zmazaný.')
+            }}
+          >
+            Uložiť
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Kroky a aktivity (beh, chôdza) vie Skratka posielať aj sama cez adresu `?hk=steps&steps=…` alebo `?hk=activity&…`. Keď návrat zo Skratky otvorí
+          Safari namiesto appky na ploche, použi „Vložiť zo schránky“ pri tréningu.
         </p>
       </Card>
 

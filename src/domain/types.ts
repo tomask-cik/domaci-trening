@@ -29,6 +29,8 @@ export interface Settings {
   anthropicApiKey?: string
   /** ISO čas poslednej úspešnej zálohy. */
   lastBackupAt?: string
+  /** Názov Skratky (iOS), ktorá po tréningu doplní tep a energiu z hodiniek. */
+  healthShortcutName?: string
 }
 
 export interface RunLog {

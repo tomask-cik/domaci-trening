@@ -100,6 +100,26 @@ export function parseHealthParams(search: string, today: string): HealthImport |
   return null
 }
 
+/**
+ * To isté z textu v schránke: celá adresa (`https://…/?hk=workout&id=17&kcal=380`) alebo
+ * len parametre (`hk=workout&id=17&kcal=380`, aj s otáznikom na začiatku). Záložná cesta,
+ * keď návratová adresa zo Skratky otvorí Safari namiesto appky na ploche.
+ */
+export function parseHealthText(text: string, today: string): HealthImport | null {
+  const t = text.trim()
+  if (!t) return null
+  let query = t
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      query = new URL(t).search
+    } catch {
+      return null
+    }
+  }
+  if (!query.startsWith('?')) query = `?${query}`
+  return parseHealthParams(query, today)
+}
+
 /** Tep mimo 30–230 je chyba merania, nie údaj. */
 function hrOf(v: string | null): number | null {
   const n = int(v, 300)

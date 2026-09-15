@@ -45,6 +45,8 @@ export interface WorkoutSummary {
   workoutId: number
   date: string
   template: TemplateId
+  startedAt: string
+  finishedAt: string | undefined
   isDeload: boolean
   setCount: number
   /** Σ (váha × opakovania) – len cviky so záťažou. */
@@ -53,6 +55,9 @@ export interface WorkoutSummary {
   maxPain: number
   exercises: ExerciseLine[]
   prs: PersonalRecord[]
+  /** Z hodiniek cez Skratky, ak prišlo. */
+  healthKcal: number | null
+  healthAvgHr: number | null
 }
 
 function unitFor(exerciseId: string): ScoreUnit {
@@ -152,6 +157,8 @@ export function buildHistory(workouts: Workout[], sets: SetLog[]): WorkoutSummar
       workoutId: id,
       date: w.date,
       template: w.template,
+      startedAt: w.startedAt,
+      finishedAt: w.finishedAt,
       isDeload: w.isDeload,
       setCount: logged.length,
       volumeKg: Math.round(volumeKg),
@@ -159,6 +166,8 @@ export function buildHistory(workouts: Workout[], sets: SetLog[]): WorkoutSummar
       maxPain: Math.max(0, ...logged.map((s) => s.pain ?? 0)),
       exercises: lines,
       prs,
+      healthKcal: typeof w.healthKcal === 'number' ? w.healthKcal : null,
+      healthAvgHr: typeof w.healthAvgHr === 'number' ? w.healthAvgHr : null,
     })
   }
 

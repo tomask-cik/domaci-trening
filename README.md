@@ -102,6 +102,42 @@ npx vercel --prod
 
 Po pridaní funguje appka offline (service worker), spúšťa sa na celú obrazovku a dáta zostávajú v telefóne. Vibrácie časovača fungujú na Androide; iOS vibrácie z webu nepodporuje, tam ostáva zvuk.
 
+## Apple Health cez Skratky (iPhone)
+
+Safari nemá prístup k HealthKitu, takže dáta z hodiniek musí do appky dotlačiť aplikácia **Skratky**. Appka rozumie trom adresám:
+
+| Čo | Adresa (za základnou adresou appky) |
+|---|---|
+| kroky za deň | `?hk=steps&date=2026-09-15&steps=8432` (`date` sa dá vynechať = dnes) |
+| beh, chôdza, joga | `?hk=activity&type=run&date=2026-09-15&meters=5120&seconds=1840&kcal=430&hr=148` (`type`: run, walk, yoga, strength, other) |
+| tep a energia k tréningu z appky | `?hk=workout&id=17&kcal=380&hr=132` |
+
+Všetky čísla sa kontrolujú (tep 30–230, kroky do 200 000…); nezmysel sa nezapíše.
+
+### Skratka „Tréning do appky“ (tep a energia po tréningu)
+
+Po ukončení tréningu appka ponúkne tlačidlo **Doplniť tep a energiu z hodiniek**. To spustí Skratku cez `shortcuts://run-shortcut?name=…&input=text&text=…` a dá jej text v tvare
+
+```json
+{"id": 17, "start": "2026-09-15T16:00:00.000Z", "end": "2026-09-15T16:45:00.000Z", "return": "https://tomask-cik.github.io/domaci-trening/?hk=workout&id=17"}
+```
+
+Skratka (názov si nastav vo **Viac → Apple Health**, musí sedieť presne):
+
+1. **Prijať vstup** – typ Text (Skratka bez vstupu sa spustí s prázdnym textom).
+2. **Získať slovník zo vstupu** (Get Dictionary from Input).
+3. **Získať hodnotu zo slovníka** pre kľúče `start`, `end`, `return` (a `id` pre kontrolu).
+4. **Nájsť vzorky zdravia** (Find Health Samples): typ *Aktívna energia*, filter *Dátum začiatku je po* `start` a *Dátum konca je pred* `end` → **Vypočítať štatistiku** Súčet → premenná `kcal` (zaokrúhli na celé číslo).
+5. **Nájsť vzorky zdravia**: typ *Tep*, rovnaký filter → **Vypočítať štatistiku** Priemer → premenná `hr` (zaokrúhli).
+6. **Text**: `return` + `&kcal=` + `kcal` + `&hr=` + `hr` (napr. `https://…/domaci-trening/?hk=workout&id=17&kcal=380&hr=132`).
+7. **Otvoriť adresu** s týmto textom. **Odporúčanie:** pridaj ešte **Kopírovať do schránky** s tým istým textom.
+
+**Prečo aj schránka.** Adresa otvorená zo Skratiek sa na iPhone môže otvoriť v Safari, nie v appke pridanej na plochu – a tie dve majú **oddelené úložisko** (IndexedDB). Ak sa to stane, v appke na ploche stlač pri tréningu **Vložiť zo schránky**: appka si text prečíta a zapíše to isté. Bod 7 preto rob oboma spôsobmi. Pri prvom čítaní schránky sa iOS spýta na povolenie.
+
+Skratky na kroky a beh sa robia rovnako, len bez vstupu: prečítaj vzorky za dnešok (kroky: súčet) a otvor adresu `…/?hk=steps&steps=…`. Automatizácia „každý deň o 22:00“ ich vie spúšťať sama.
+
+> Toto je overené len logicky a v testoch (`tests/healthImport.test.ts`, `tests/healthShortcut.test.ts`), nie na skutočnom iPhone. Ak sa niečo v Skratkách volá inak, riadi sa tým, čo appka očakáva v adrese.
+
 ## Ako to funguje vo vnútri
 
 ```

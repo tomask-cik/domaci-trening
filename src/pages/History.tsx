@@ -11,6 +11,7 @@ import { num } from '../lib/format'
 import { buildWeekContext, WEEK_SYSTEM } from '../domain/summary'
 import { proteinFor } from '../domain/protein'
 import { AiSummary } from '../components/AiSummary'
+import { WatchCard } from '../components/WatchCard'
 import type { DayLog, FoodEntry, RunLog, Settings, SetLog, Workout } from '../domain/types'
 
 const PAGE = 15
@@ -154,7 +155,7 @@ export default function History({ settings }: { settings: Settings }) {
         <CardTitle right={<Pill>{history.length}</Pill>}>Odcvičené tréningy</CardTitle>
         <ul className="space-y-2">
           {history.slice(0, limit).map((w) => (
-            <WorkoutRow key={w.workoutId} w={w} />
+            <WorkoutRow key={w.workoutId} w={w} settings={settings} />
           ))}
         </ul>
         {limit < history.length ? (
@@ -172,7 +173,7 @@ export default function History({ settings }: { settings: Settings }) {
   )
 }
 
-function WorkoutRow({ w }: { w: WorkoutSummary }) {
+function WorkoutRow({ w, settings }: { w: WorkoutSummary; settings: Settings }) {
   return (
     <li className="rounded-xl border border-line bg-surface2">
       <details>
@@ -185,6 +186,8 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
               Tréning {w.template} · {w.setCount} sérií
               {w.volumeKg > 0 ? ` · ${num(w.volumeKg)} kg` : ''}
               {w.avgRpe !== null ? ` · RPE ${num(w.avgRpe, 1)}` : ''}
+              {w.healthKcal !== null ? ` · ⌚️ ${w.healthKcal} kcal` : ''}
+              {w.healthAvgHr !== null ? ` · tep ${w.healthAvgHr}` : ''}
             </span>
           </span>
           <span className="flex shrink-0 gap-1">
@@ -215,6 +218,13 @@ function WorkoutRow({ w }: { w: WorkoutSummary }) {
               Nový rekord: {w.prs.map((p) => `${p.name} ${p.detail}`).join(', ')}
             </p>
           ) : null}
+          <div className="mt-3">
+            <WatchCard
+              workout={{ id: w.workoutId, startedAt: w.startedAt, finishedAt: w.finishedAt, healthKcal: w.healthKcal, healthAvgHr: w.healthAvgHr }}
+              settings={settings}
+              compact
+            />
+          </div>
         </div>
       </details>
     </li>

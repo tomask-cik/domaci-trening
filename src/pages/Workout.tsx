@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { TimerBar } from '../components/Timer'
+import { WatchCard } from '../components/WatchCard'
 import { useCountdown } from '../hooks/useCountdown'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { Banner, Button, Card, CardTitle, Pill } from '../components/ui'
@@ -84,6 +85,10 @@ export default function Workout({ settings }: { settings: Settings }) {
               </li>
             ))}
           </ul>
+        </Card>
+        <Card>
+          <CardTitle>Hodinky</CardTitle>
+          <WatchCard workout={workout} settings={settings} />
         </Card>
         <Button className="w-full" onClick={() => navigate('/dnes')} data-testid="back-home">
           Späť na dnešok
