@@ -15,7 +15,9 @@ import { stepGoalForWeek } from '../domain/steps'
 import type { Settings } from '../domain/types'
 import { currentWeightKg, movingAverage, PHASE_NAMES, phaseFor, weightPoints } from '../domain/weight'
 import { useDay, useDays, useThisWeek, useToday, useWeekReviews, useWorkouts } from '../hooks/useAppData'
+import { BACKUP_MESSAGE, runBackup } from '../lib/backupFile'
 import { kcal, kg, num, signed, steps as fmtSteps } from '../lib/format'
+import { backupReminderDue, daysSinceBackup } from '../lib/storage'
 
 export default function Today({ settings }: { settings: Settings }) {
   const today = useToday()
@@ -30,6 +32,7 @@ export default function Today({ settings }: { settings: Settings }) {
   const workouts = useWorkouts()
   const reviews = useWeekReviews()
   const [showBreaks, setShowBreaks] = useState(false)
+  const [backupMsg, setBackupMsg] = useState<string | null>(null)
 
   if (!days || !workouts || !reviews || day === undefined) return <div className="text-muted">Načítavam…</div>
 
@@ -62,6 +65,27 @@ export default function Today({ settings }: { settings: Settings }) {
         </div>
         {plan.isDeload ? <Pill tone="warn">Deload</Pill> : <Pill tone="accent">{plan.doneThisWeek}/{settings.daysPerWeek} tréningy</Pill>}
       </header>
+
+      {backupReminderDue(settings.lastBackupAt, settings.programStartDate, today) ? (
+        <Banner tone="warn">
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              {settings.lastBackupAt
+                ? `Záloha má ${String(daysSinceBackup(settings.lastBackupAt))} dní. Dáta sú len v tomto telefóne.`
+                : 'Ešte bez zálohy. Dáta sú len v tomto telefóne.'}
+            </span>
+            <Button
+              variant="secondary"
+              className="shrink-0 px-3"
+              data-testid="backup-now"
+              onClick={() => void runBackup(today).then((o) => setBackupMsg(BACKUP_MESSAGE[o]))}
+            >
+              Zálohovať
+            </Button>
+          </div>
+        </Banner>
+      ) : null}
+      {backupMsg ? <Banner tone="good">{backupMsg}</Banner> : null}
 
       {plan.isDeload ? (
         <Banner tone="warn">

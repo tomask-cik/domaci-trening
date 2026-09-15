@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import { TrainingDB } from '../src/db/db'
-import { BACKUP_VERSION, exportAll, importAll, validateBackup } from '../src/db/backup'
+import { BACKUP_VERSION, backupFileName, exportAll, importAll, stripSecrets, validateBackup } from '../src/db/backup'
 
 describe('export / import', () => {
   it('round-trip zachová všetky tabuľky', async () => {
@@ -30,6 +30,25 @@ describe('export / import', () => {
     const res = await importAll(c, { app: 'domaci-trening', version: 1, exportedAt: 'x', tables: { days: [{ date: '2026-01-01', weightKg: 100 }] } })
     expect(res.counts.days).toBe(1)
     expect(await c.foods.count()).toBe(0)
+  })
+  it('API kľúč sa do zálohy nedostane, ostatné nastavenia áno', async () => {
+    const d = new TrainingDB('test-d')
+    await d.settings.put({ id: 1, calorieTarget: 2310, anthropicApiKey: 'sk-ant-tajny-kluc-1234567890', kettlebells: [12] } as never)
+    const backup = await exportAll(d)
+    const row = backup.tables.settings?.[0] as Record<string, unknown>
+    expect(row.calorieTarget).toBe(2310)
+    expect(row.anthropicApiKey).toBeUndefined()
+    expect(JSON.stringify(backup)).not.toContain('sk-ant')
+    // V databáze kľúč ostáva – export ho nemaže.
+    expect((await d.settings.get(1))?.anthropicApiKey).toBe('sk-ant-tajny-kluc-1234567890')
+  })
+  it('stripSecrets nemení vstup a odstráni len tajomstvá', () => {
+    const row = { id: 1, anthropicApiKey: 'x', calorieTarget: 2000 }
+    expect(stripSecrets(row)).toEqual({ id: 1, calorieTarget: 2000 })
+    expect(row.anthropicApiKey).toBe('x')
+  })
+  it('názov súboru má dátum', () => {
+    expect(backupFileName('2026-09-15')).toBe('domaci-trening-2026-09-15.json')
   })
   it('odmietne cudzí súbor', () => {
     expect(validateBackup({ foo: 1 }).ok).toBe(false)

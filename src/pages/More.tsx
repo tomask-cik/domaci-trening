@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Banner, Button, Card, CardTitle, NumberField, Pill } from '../components/ui'
 import { resetAll, triggerDeload, updateSettings } from '../db/actions'
-import { exportAll, importAll } from '../db/backup'
+import { importAll } from '../db/backup'
 import { db } from '../db/db'
 import { calorieFloor, mifflinStJeor, tdeeEstimate } from '../domain/calories'
 import { KB_OPTIONS, SLEEP_SHORT_HOURS, SLEEP_SHORT_NIGHTS } from '../domain/constants'
@@ -12,6 +12,7 @@ import type { Settings } from '../domain/types'
 import { currentWeightKg } from '../domain/weight'
 import { useDays, useWeekReviews } from '../hooks/useAppData'
 import { kcal, kg, signed } from '../lib/format'
+import { BACKUP_MESSAGE, runBackup } from '../lib/backupFile'
 import { backupOverdue, daysSinceBackup, isStoragePersisted } from '../lib/storage'
 import { hasApiKey } from '../lib/claude'
 
@@ -42,18 +43,8 @@ export default function More({ settings }: { settings: Settings }) {
   const earlyDeload = shouldSuggestEarlyDeload({ repsDroppedTwice: false, jointPain: false, shortSleepNights: shortSleep >= SLEEP_SHORT_NIGHTS, highRpe: false })
 
   async function doExport() {
-    const backup = await exportAll(db)
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `domaci-trening-${today}.json`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    await updateSettings({ lastBackupAt: new Date().toISOString() })
-    setMessage('Záloha stiahnutá. Ulož si ju do iCloud Drive alebo Google Drive – v Stiahnutých je len v tomto telefóne.')
+    const outcome = await runBackup(today)
+    setMessage(BACKUP_MESSAGE[outcome])
     setError(null)
   }
 
@@ -222,7 +213,7 @@ export default function More({ settings }: { settings: Settings }) {
         ) : null}
         <div className="mt-2 space-y-2">
           <Button variant="secondary" className="w-full" onClick={() => void doExport()} data-testid="export">
-            Exportovať dáta (JSON)
+            Zálohovať (JSON do iCloud / stiahnuť)
           </Button>
           <input
             ref={fileRef}
@@ -239,7 +230,9 @@ export default function More({ settings }: { settings: Settings }) {
           <Button variant="secondary" className="w-full" onClick={() => fileRef.current?.click()}>
             Importovať zálohu
           </Button>
-          <p className="text-xs text-muted">Import prepíše všetky dáta v telefóne. Exportuj si zálohu pravidelne – appka nikam nič neposiela.</p>
+          <p className="text-xs text-muted">
+            Na iPhone sa otvorí zdieľanie – vyber „Uložiť do Súborov“ a iCloud Drive. Import prepíše všetky dáta v telefóne. API kľúč sa do zálohy nedáva, po obnove ho zadaj znova.
+          </p>
         </div>
       </Card>
 

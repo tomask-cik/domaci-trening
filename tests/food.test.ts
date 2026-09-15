@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { dayTotals, parseNutrition, proteinProgress, scaleToGrams, validGrams } from '../src/domain/food'
 import { buildDayContext, buildWeekContext } from '../src/domain/summary'
-import { backupOverdue, daysSinceBackup } from '../src/lib/storage'
+import { backupOverdue, backupReminderDue, daysSinceBackup } from '../src/lib/storage'
 import type { FoodEntry } from '../src/domain/types'
 
 const entry = (p: Partial<FoodEntry> = {}): FoodEntry => ({
@@ -86,6 +86,12 @@ describe('stav zálohy', () => {
     expect(backupOverdue(undefined, now)).toBe(true)
     expect(backupOverdue('2026-09-13T12:00:00Z', now)).toBe(false)
     expect(backupOverdue('2026-08-20T12:00:00Z', now)).toBe(true)
+  })
+  it('pripomienka na Dnes: bez zálohy až od 3. dňa programu, inak po 14 dňoch', () => {
+    expect(backupReminderDue(undefined, '2026-09-14', '2026-09-14', now)).toBe(false)
+    expect(backupReminderDue(undefined, '2026-09-11', '2026-09-14', now)).toBe(true)
+    expect(backupReminderDue('2026-09-13T12:00:00Z', '2026-01-01', '2026-09-14', now)).toBe(false)
+    expect(backupReminderDue('2026-08-20T12:00:00Z', '2026-01-01', '2026-09-14', now)).toBe(true)
   })
 })
 
