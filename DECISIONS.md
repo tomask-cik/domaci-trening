@@ -80,3 +80,28 @@ Po dokončení appky som prešiel program aj kód oproti RESEARCH.md. Toto sú n
 - **Appka nesleduje kardio jednotky**, len kroky. Zadanie žiadalo zápis krokov; kardio je v PROGRAM.md ako inštrukcia. Pridanie ďalšieho zápisu by appku zaťažilo bez úžitku.
 - **Mikropauzy nemajú notifikácie na pozadí.** PWA bez servera to nedokáže; appka radí nastaviť budík v telefóne.
 - **Predný sklon panvy sa nikde „neopravuje“.** Appka o ňom nehovorí ako o chybe – R7 hovorí, že to nie je príčina bolesti a 85 % mužov bez ťažkostí ho má. Mobilita je zdôvodnená rozsahom pohybu a pohodlím, nie naprávaním.
+
+## F. Kolo 2 (2026-09-15): dotiahnutie appky – rozhodnutia
+
+| # | Rozhodnutie | Prečo |
+|---|---|---|
+| F1 | **Záloha cez Web Share API** (súbor do share sheetu → iCloud Drive), inak stiahnutie; **API kľúč sa do zálohy nedáva** | záloha ide do cloudu alebo mailu; kľúč sa po obnove zadá znova. Pripomienka na Dnes bez zálohy od 3. dňa, inak po 14 dňoch |
+| F2 | `saveDay` v rw transakcii | dva rýchle zápisy (hmotnosť, hneď kroky) prečítali rovnaký starý riadok a druhý prepísal prvý – strata hmotnosti; e2e test to odhalil |
+| F3 | **Rozcvičovacie série** ako `SetLog.warmup`, mimo progresie, rekordov, objemu a počtu sérií | PROGRAM.md 1.3 bod 6; jedna vlajka, žiadna druhá tabuľka |
+| F4 | **Výmena cviku** ako `Workout.swaps` (poradie v šablóne → id), nie zmena šablóny | história vie, čo sa cvičilo; ďalší tréning je podľa plánu; bez zmeny schémy Dexie |
+| F5 | **Apple Health**: appka spustí Skratku cez `shortcuts://run-shortcut` s JSON `{id, start, end, return}`; návrat cez `?hk=workout…` **alebo schránka** | adresa zo Skratiek môže otvoriť Safari, nie appku na ploche (oddelené IndexedDB); schránka funguje vždy. **Neoverené na skutočnom iPhone.** |
+| F6 | **Skutočný objem** z `SetLog × Exercise.groups` podľa dátumu série; plán z reálneho poradia šablón v týždni | A/B/A a B/A/B majú iný objem zadku (výpady); plán sa nemá tváriť, že je paušálny |
+| F7 | **Dodržiavanie** = ukončené tréningy / `daysPerWeek` z aktuálnych nastavení pre všetky týždne | história zmien nastavení sa neukladá; percento len z uzavretých týždňov |
+| F8 | **Ručná úprava stavu cviku** oreže na rozsah a vynuluje streaky | človek vie viac než algoritmus; ale nesmie vytvoriť stav mimo rozsahu, s ktorým progresia nepočíta |
+| F9 | **% tuku** s referenčnou hmotnosťou z času merania (`bodyFatRefKg`) | E4: čistá hmota sa viaže na hmotnosť pri meraní, nie na štart ani na dnešok |
+| F10 | **Wake lock** počas tréningu a mobility; **−/+ steppery** namiesto klávesnice; mazanie série s prečíslovaním | telefón na zemi, spotené ruky; po zmazaní série 2 z 3 by ďalší zápis prepísal tretiu |
+| F11 | Ukončený tréning otvorený znova je len na čítanie | progresia sa vyhodnocuje raz; ďalšie série by do nej nevstúpili |
+
+### Čo som v kole 2 nechal tak a prečo (čaká na rozhodnutie)
+
+- **Vzorec pre beh** (`running.ts`): „hrubý výdaj 1,036 kcal/kg/km nezávislý od tempa mínus pokojový metabolizmus“ podhodnocuje čistý výdaj o ~7–10 % pri pomalšom tempe. Nezávislý od tempa je podľa ACSM **čistý** výdaj (~1,0 kcal/kg/km), nie hrubý. Ručný zápis navyše nemá typ „chôdza“ (chôdza má ~polovičný výdaj). Číslo nevstupuje do kalorického cieľa (ten je adaptívny z trendu), takže chyba je len v zobrazení a v AI kontexte. Zmena čaká na súhlas.
+- **Znaky skoršieho deloadu** (PROGRAM.md 5): appka vyhodnocuje len spánok (opravené okno 7 nocí); pokles opakovaní, bolesť kĺbov a vysoké RPE sa z dát dajú spočítať, ale prahy (koľko cvikov, koľko tréningov) sú nové doménové rozhodnutie. Čaká na súhlas.
+- **Týždeň po deloade** vo vyhodnotení kalórií: po udržiavacom týždni hmotnosť spadne (voda, glykogén), algoritmus to číta ako rýchle chudnutie a pridá kalórie. Možnosť: týždeň po deloade tiež preskočiť, alebo porovnávať s týždňom pred deloadom. Čaká na súhlas.
+- **Guma** (`hasBand`) sa nikde nepoužíva – štádiá zhybov 4 a 5 ju predpokladajú. Bez gumy má štádium 3 alternatívu „noha na stoličke“; appka to nerozlišuje.
+- **`PAIN_SKIP_ABOVE` (5/10)** je konštanta bez použitia: pri bolesti > 5 program hovorí „vynechať cvik“, appka len ustúpi o krok (> 3).
+- **Program s hrazdou a bradlami (5.5)**: obsahové poznámky sú v správe z kola 2, nie v kóde.

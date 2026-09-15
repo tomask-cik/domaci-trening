@@ -16,18 +16,22 @@ Program je postavený pre profil: muž, sedavá práca, 105 kg → 85 kg, rekomp
 |---|---|
 | Úvodné nastavenie (vek, výška, hmotnosť, cieľ, kettlebelly, dni, minúty) | prvé spustenie |
 | Dnešný tréning s odporúčanou váhou a opakovaniami | **Dnes** |
-| Zápis sérií (váha, opakovania, RPE, bolesť) a časovač pauzy s vibráciou a zvukom | **Dnes → tréning** |
-| Automatický návrh progresie na ďalší tréning | po ukončení tréningu |
+| Zápis sérií (váha, opakovania, RPE, bolesť, poznámka, rozcvičovacia), −/+ jednou rukou, mazanie série, časovač pauzy, obrazovka nezhasne | **Dnes → tréning** |
+| Výmena cviku počas tréningu (náhrada pri bolesti z knižnice) | **Dnes → tréning → vymeniť** |
+| Automatický návrh progresie na ďalší tréning; ručná úprava plánu cviku (štádium, váha, cieľ) | po ukončení tréningu; **Cviky** |
+| Tep a aktívna energia z hodiniek k tréningu (Skratka, schránka) | po ukončení tréningu, **História** |
 | Denná hmotnosť, 7-dňový kĺzavý priemer, graf trendu | **Dnes**, **Telo** |
 | Adaptívny kalorický cieľ (prepočet raz týždenne z trendu) a cieľ bielkovín | **Dnes**, **Viac** |
 | Kroky a týždenný prehľad | **Dnes**, **Telo** |
-| Grafy: hmotnosť, odhad 1RM v kľúčových cvikoch, zhyby | **Telo** |
+| Grafy: hmotnosť, sila v čase pre každý cvik s dátami (odhad 1RM / opakovania / sekundy), zápis pre iný deň | **Telo** |
+| Skutočný týždenný objem na partiu oproti plánu, dodržiavanie plánu po týždňoch | **História** |
 | Mobilitná rutina so sprievodcom a časovačom (~12 min) | **Mobilita** |
 | Knižnica cvikov: technika, chyby, regresia, progresia, náhrada pri bolesti | **Cviky** |
 | Deload v kalendári + tlačidlo „spustiť skôr“ | **Viac** |
-| Export a import dát (JSON) | **Viac** |
+| Záloha na jedno klepnutie (share sheet → iCloud Drive), import, pripomienka | **Viac**, **Dnes** |
+| Denník jedla s odhadom kalórií cez Claude API, AI sumár dňa a týždňa | **Dnes → Jedlo**, **História** |
 
-Dáta sú **len v telefóne** (IndexedDB). Nikam sa neposielajú, nie je tu účet ani cloud. Záloha = export JSON.
+Dáta sú **len v telefóne** (IndexedDB). Nikam sa neposielajú, nie je tu účet ani cloud. Záloha = JSON súbor (bez API kľúča). Jediné, čo ide na internet, sú volania Claude API pri odhade kalórií a sumároch – a tie sa dajú nepoužívať.
 
 ## Spustenie lokálne
 
