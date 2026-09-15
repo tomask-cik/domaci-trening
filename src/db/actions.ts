@@ -150,6 +150,7 @@ export async function finishWorkout(workoutId: number, settings: Settings, today
   const sets = await db.sets.where('workoutId').equals(workoutId).toArray()
   const byExercise = new Map<string, SetLog[]>()
   for (const s of sets) {
+    if (s.warmup) continue // rozcvičovacie série progresiu neovplyvňujú
     const arr = byExercise.get(s.exerciseId) ?? []
     arr.push(s)
     byExercise.set(s.exerciseId, arr)

@@ -207,7 +207,7 @@ function WorkoutRow({ w, settings }: { w: WorkoutSummary; settings: Settings }) 
                   {e.name}
                 </span>
                 <span className={`shrink-0 ${e.isPr ? 'font-semibold text-good' : 'text-muted'}`}>
-                  {e.setCount}× · {e.best}
+                  {e.setCount}×{e.warmupCount ? ` (+${e.warmupCount} rozcv.)` : ''} · {e.best}
                 </span>
                 {e.notes.length ? <span className="basis-full text-xs text-muted">✎ {e.notes.join(' · ')}</span> : null}
               </li>

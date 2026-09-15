@@ -16,6 +16,8 @@ import { nextHeavier, nextLighter, recommend } from '../domain/progression'
 import type { ExerciseState, Settings, SetLog } from '../domain/types'
 
 const RPE_OPTIONS = [6, 7, 8, 9, 10]
+/** Po rozcvičovacej sérii stačí krátka pauza. */
+const WARMUP_REST_SEC = 30
 
 export default function Workout({ settings }: { settings: Settings }) {
   const [params] = useSearchParams()
@@ -195,8 +197,9 @@ export default function Workout({ settings }: { settings: Settings }) {
                 rpe: values.rpe,
                 pain: values.pain,
                 note: values.note || undefined,
+                warmup: values.warmup || undefined,
               })
-              timer.start(item.restSec)
+              timer.start(values.warmup ? Math.min(item.restSec, WARMUP_REST_SEC) : item.restSec)
             }}
             onDelete={async (s) => {
               if (!confirm(`Zmazať sériu ${s.setIndex + 1} (${describeSet(s)})?`)) return
@@ -297,6 +300,7 @@ interface LogValues {
   rpe: number
   pain: number | null
   note: string
+  warmup: boolean
 }
 
 /**
@@ -368,14 +372,17 @@ function ExerciseCard({
   onLog: (setIndex: number, values: LogValues) => Promise<void>
   onDelete: (s: SetLog) => Promise<void>
 }) {
-  const doneCount = logged.length
-  const nextIndex = doneCount
+  // Do počtu sérií cviku sa rátajú len pracovné; index série ide cez všetky (aj rozcvičovacie).
+  const doneCount = logged.filter((s) => !s.warmup).length
+  const nextIndex = logged.length
   const [weight, setWeight] = useState<number | null>(rec.weightKg)
   const [amount, setAmount] = useState<number | null>(rec.unit === 'sec' ? rec.targetSeconds : rec.targetReps)
   const [rpe, setRpe] = useState(8)
   const [pain, setPain] = useState<number | null>(null)
   const [note, setNote] = useState('')
+  const [warmup, setWarmup] = useState(false)
   const complete = doneCount >= sets
+  let workingNo = 0
   const amountStep = rec.unit === 'sec' ? 5 : 1
 
   // Váha skáče po kettlebelloch, ktoré naozaj máš – medzi 16 a 24 nič iné neexistuje.
@@ -414,10 +421,10 @@ function ExerciseCard({
       {logged.length ? (
         <ul className="mt-3 space-y-1 text-sm">
           {logged.map((s) => (
-            <li key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface2 py-1 pl-3 pr-1">
+            <li key={s.id} className={`flex items-center justify-between gap-2 rounded-lg bg-surface2 py-1 pl-3 pr-1 ${s.warmup ? 'text-muted' : ''}`}>
               <span className="min-w-0">
                 <span className="block">
-                  Séria {s.setIndex + 1}: {s.weightKg !== null ? `${s.weightKg} kg × ` : ''}
+                  {s.warmup ? 'Rozcvička' : `Séria ${++workingNo}`}: {s.weightKg !== null ? `${s.weightKg} kg × ` : ''}
                   {s.seconds !== null ? `${s.seconds} s` : `${s.reps ?? 0} op.`}
                 </span>
                 {s.note ? <span className="block text-xs text-muted">✎ {s.note}</span> : null}
@@ -473,6 +480,14 @@ function ExerciseCard({
               ))}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setWarmup((v) => !v)}
+            data-testid="warmup-toggle"
+            className={`rounded-full border px-3 py-1 text-xs ${warmup ? 'border-warn bg-warn/15 text-warn' : 'border-line bg-bg text-muted'}`}
+          >
+            {warmup ? 'rozcvičovacia séria – neráta sa' : 'označiť ako rozcvičovaciu'}
+          </button>
           <details>
             <summary className="cursor-pointer text-xs text-muted">Bolesť a poznámka (voliteľné)</summary>
             <div className="mt-2 flex gap-1.5">
@@ -508,11 +523,13 @@ function ExerciseCard({
                 rpe,
                 pain,
                 note: note.trim(),
+                warmup,
               })
               setNote('')
+              setWarmup(false)
             }}
           >
-            Zapísať sériu {nextIndex + 1}
+            {warmup ? 'Zapísať rozcvičovaciu sériu' : `Zapísať sériu ${doneCount + 1}`}
           </Button>
         </div>
       ) : (

@@ -126,6 +126,20 @@ describe('tréning', () => {
     expect((await db.workouts.get(wid))?.swaps).toEqual({ 0: 'glute_bridge' })
     await setSwap(999, 0, 'kb_row') // neznámy tréning nič nespraví
   })
+  it('rozcvičovacie série nevstupujú do progresie', async () => {
+    const s = await freshSettings()
+    const wid = await startWorkout(s, 'A', TODAY)
+    const base = { workoutId: wid, date: TODAY, exerciseId: 'goblet_squat', weightKg: 16, seconds: null, pain: null }
+    await logSet({ ...base, setIndex: 0, weightKg: 12, reps: 15, rpe: 6, warmup: true })
+    for (let i = 1; i <= 3; i++) await logSet({ ...base, setIndex: i, reps: 6, rpe: 8 })
+    const results = await finishWorkout(wid, s, TODAY)
+    expect(results[0]?.change).toBe('up_reps') // 12 kg × 15 z rozcvičky by inak spustilo ľahšiu váhu / iný cieľ
+    expect((await db.exerciseStates.get('goblet_squat'))?.weightKg).toBe(16)
+    expect((await db.exerciseStates.get('goblet_squat'))?.targetReps).toBe(7)
+    const only = await startWorkout(s, 'B', '2026-09-18')
+    await logSet({ ...base, workoutId: only, date: '2026-09-18', exerciseId: 'kb_row', setIndex: 0, reps: 5, rpe: 6, warmup: true })
+    expect(await finishWorkout(only, s, '2026-09-18')).toEqual([])
+  })
   it('v deload týždni finishWorkout stav nemení', async () => {
     const s = await freshSettings()
     const deload = { ...s, manualDeloadWeeks: ['2026-09-14'] }

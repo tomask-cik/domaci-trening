@@ -100,6 +100,11 @@ export interface SetLog {
   pain: number | null
   /** Voľná poznámka („ľavá strana slabšia“, „nový úchop“). */
   note?: string
+  /**
+   * Rozcvičovacia séria: eviduje sa (váha, opakovania), ale neráta sa do progresie, rekordov,
+   * objemu ani do počtu sérií cviku. Chýbajúce = pracovná (staršie záznamy).
+   */
+  warmup?: boolean
 }
 
 export interface ExerciseState {
