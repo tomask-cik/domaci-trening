@@ -6,7 +6,7 @@
  */
 
 import { dayTotals } from './food'
-import type { DayLog, FoodEntry, Workout } from './types'
+import type { DayLog, FoodEntry, RunLog, Workout } from './types'
 
 export interface DayContext {
   date: string
@@ -18,6 +18,8 @@ export interface DayContext {
   weightKg: number | null
   steps: number | null
   trainedToday: boolean
+  runKm: number
+  runKcal: number
 }
 
 export function buildDayContext(
@@ -26,6 +28,7 @@ export function buildDayContext(
   day: DayLog | undefined,
   targets: { kcal: number; proteinG: number },
   trainedToday: boolean,
+  runs: RunLog[] = [],
 ): DayContext {
   const t = dayTotals(foods)
   return {
@@ -38,6 +41,8 @@ export function buildDayContext(
     weightKg: day?.weightKg ?? null,
     steps: day?.steps ?? null,
     trainedToday,
+    runKm: Math.round((runs.reduce((n, r) => n + r.meters, 0) / 1000) * 100) / 100,
+    runKcal: runs.reduce((n, r) => n + r.kcal, 0),
   }
 }
 
@@ -56,6 +61,9 @@ export interface WeekContext {
   weightChangeKg: number | null
   avgSteps: number | null
   prCount: number
+  runs: number
+  runKmTotal: number
+  runKcalTotal: number
 }
 
 function mean(xs: number[]): number | null {
@@ -70,6 +78,7 @@ export function buildWeekContext(
   workouts: Workout[],
   targets: { kcal: number; proteinG: number },
   prCount: number,
+  runs: RunLog[] = [],
 ): WeekContext {
   const inRange = <T extends { date: string }>(xs: T[]) => xs.filter((x) => x.date >= from && x.date <= to)
   const d = inRange(days).sort((a, b) => (a.date < b.date ? -1 : 1))
@@ -101,18 +110,23 @@ export function buildWeekContext(
     weightChangeKg: start !== null && end !== null ? Math.round((end - start) * 10) / 10 : null,
     avgSteps: steps.length ? Math.round(steps.reduce((a, b) => a + b, 0) / steps.length) : null,
     prCount,
+    runs: inRange(runs).length,
+    runKmTotal: Math.round((inRange(runs).reduce((n, r) => n + r.meters, 0) / 1000) * 100) / 100,
+    runKcalTotal: inRange(runs).reduce((n, r) => n + r.kcal, 0),
   }
 }
 
 export const DAY_SYSTEM = `Si tréner a výživový poradca. Dostaneš JSON so záznamom jedného dňa.
 Napíš po slovensky krátke zhrnutie – maximálne 6 viet, bez nadpisov a bez odrážok.
 Povedz, ako deň vyšiel oproti cieľom, čo bolo dobré a čo by si zmenil zajtra.
+Kalórie z behu (runKcal) sú výdaj, nie príjem – neodporúčaj ich dojedať.
 Buď konkrétny a vychádzaj len z čísel, ktoré máš. Keď je dáta málo, povedz to namiesto hádania.
 Nikdy neodporúčaj denný príjem pod 1200 kcal ani vynechávanie jedál.`
 
 export const WEEK_SYSTEM = `Si tréner a výživový poradca. Dostaneš JSON so súhrnom jedného týždňa.
 Napíš po slovensky zhrnutie – maximálne 10 viet, bez nadpisov a bez odrážok.
-Zhodnoť tréningovú dochádzku, priemerný príjem oproti cieľu, bielkoviny a trend hmotnosti.
+Zhodnoť tréningovú dochádzku, beh, priemerný príjem oproti cieľu, bielkoviny a trend hmotnosti.
+Kalórie z behu sú výdaj, nie príjem – neodporúčaj ich dojedať.
 Týždenné výkyvy hmotnosti do ±1 kg sú voda, nie tuk – neprikladaj im váhu.
 Na koniec pridaj jednu konkrétnu vec, na ktorú sa má budúci týždeň sústrediť.
 Vychádzaj len z čísel, ktoré máš. Nikdy neodporúčaj denný príjem pod 1200 kcal ani vynechávanie jedál.`

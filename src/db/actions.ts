@@ -8,7 +8,7 @@ import { isDeloadWeek } from '../domain/deload'
 import { buildSession } from '../domain/program'
 import { initialState, suggestNext, type ChangeKind } from '../domain/progression'
 import { computeWeeklyReview, pendingReviewWeeks } from '../domain/review'
-import type { DayLog, ExerciseState, FoodEntry, Settings, SetLog, TemplateId } from '../domain/types'
+import type { DayLog, ExerciseState, FoodEntry, RunLog, Settings, SetLog, TemplateId } from '../domain/types'
 import { db } from './db'
 
 export interface SetupInput {
@@ -191,8 +191,8 @@ export function sessionFor(settings: Settings, template: TemplateId, isDeload: b
 }
 
 export async function resetAll(): Promise<void> {
-  await db.transaction('rw', [db.settings, db.days, db.workouts, db.sets, db.exerciseStates, db.weekReviews, db.foods], async () => {
-    await Promise.all([db.settings.clear(), db.days.clear(), db.workouts.clear(), db.sets.clear(), db.exerciseStates.clear(), db.weekReviews.clear(), db.foods.clear()])
+  await db.transaction('rw', [db.settings, db.days, db.workouts, db.sets, db.exerciseStates, db.weekReviews, db.foods, db.runs], async () => {
+    await Promise.all([db.settings.clear(), db.days.clear(), db.workouts.clear(), db.sets.clear(), db.exerciseStates.clear(), db.weekReviews.clear(), db.foods.clear(), db.runs.clear()])
   })
 }
 
@@ -226,4 +226,14 @@ export async function syncDayKcal(date: string): Promise<void> {
 export async function updateFood(id: number, patch: Partial<Omit<FoodEntry, 'id' | 'date'>>, date: string): Promise<void> {
   await db.foods.update(id, patch)
   await syncDayKcal(date)
+}
+
+// --- Beh ---
+
+export async function addRun(entry: Omit<RunLog, 'id'>): Promise<void> {
+  await db.runs.add(entry as RunLog)
+}
+
+export async function deleteRun(id: number): Promise<void> {
+  await db.runs.delete(id)
 }

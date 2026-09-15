@@ -9,7 +9,7 @@ import { num } from '../lib/format'
 import { buildWeekContext, WEEK_SYSTEM } from '../domain/summary'
 import { proteinTarget } from '../domain/protein'
 import { AiSummary } from '../components/AiSummary'
-import type { DayLog, FoodEntry, Settings, SetLog, Workout } from '../domain/types'
+import type { DayLog, FoodEntry, RunLog, Settings, SetLog, Workout } from '../domain/types'
 
 const PAGE = 15
 
@@ -18,6 +18,7 @@ export default function History({ settings }: { settings: Settings }) {
   const sets = useLiveQuery(() => db.sets.toArray(), [])
   const days = useLiveQuery(() => db.days.toArray(), [])
   const foods = useLiveQuery(() => db.foods.toArray(), [])
+  const runs = useLiveQuery(() => db.runs.toArray(), [])
   const [limit, setLimit] = useState(PAGE)
 
   const history = useMemo(
@@ -26,7 +27,7 @@ export default function History({ settings }: { settings: Settings }) {
   )
   const bests = useMemo(() => personalBests((sets ?? []) as SetLog[]), [sets])
 
-  if (!workouts || !sets || !days || !foods) return <div className="text-muted">Načítavam…</div>
+  if (!workouts || !sets || !days || !foods || !runs) return <div className="text-muted">Načítavam…</div>
 
   const today = todayISO()
   const prs28 = recentPrCount(history, today)
@@ -94,6 +95,7 @@ export default function History({ settings }: { settings: Settings }) {
             }).gramsPerDay,
           },
           history.filter((w) => w.date >= weekStart(today)).reduce((n, w) => n + w.prs.length, 0),
+          runs as RunLog[],
         )}
       />
 

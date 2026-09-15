@@ -17,6 +17,7 @@ export default function Food({ settings }: { settings: Settings }) {
   const navigate = useNavigate()
   const today = todayISO()
   const entries = useLiveQuery(() => db.foods.where('date').equals(today).toArray(), [today])
+  const runs = useLiveQuery(() => db.runs.where('date').equals(today).toArray(), [today])
 
   const [name, setName] = useState('')
   const [grams, setGrams] = useState<number | null>(100)
@@ -178,7 +179,7 @@ export default function Food({ settings }: { settings: Settings }) {
         system={DAY_SYSTEM}
         apiKey={settings.anthropicApiKey}
         hint="Posiela len dnešné čísla a názvy jedál."
-        context={buildDayContext(today, entries, undefined, { kcal: settings.calorieTarget, proteinG: protein.gramsPerDay }, false)}
+        context={buildDayContext(today, entries, undefined, { kcal: settings.calorieTarget, proteinG: protein.gramsPerDay }, false, runs ?? [])}
       />
     </div>
   )

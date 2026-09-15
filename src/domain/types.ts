@@ -31,6 +31,17 @@ export interface Settings {
   lastBackupAt?: string
 }
 
+export interface RunLog {
+  id?: number
+  date: string
+  meters: number
+  seconds: number
+  /** Čistý výdaj navyše oproti pokoju. */
+  kcal: number
+  pain?: number | null
+  note?: string
+}
+
 export interface FoodEntry {
   id?: number
   date: string

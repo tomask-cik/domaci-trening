@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Banner, Button, Card, CardTitle, NumberField, Pill, Stat } from '../components/ui'
+import { RunCard } from '../components/RunCard'
 import { saveDay, sessionFor, startWorkout } from '../db/actions'
 import { mifflinStJeor, tdeeEstimate } from '../domain/calories'
 import { BREAK_INTERVAL_MIN } from '../domain/constants'
@@ -109,6 +110,8 @@ export default function Today({ settings }: { settings: Settings }) {
           }
         />
       </Card>
+
+      <RunCard date={today} weightKg={day?.weightKg ?? lastWeight?.weightKg ?? null} />
 
       <div className="grid grid-cols-2 gap-3">
         <Stat
