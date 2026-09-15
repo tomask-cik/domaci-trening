@@ -80,6 +80,11 @@ export interface Workout {
   healthAvgHr?: number | null
   isDeload: boolean
   minutes: number
+  /**
+   * Výmeny cvikov v tomto tréningu: poradie v šablóne (SessionItem.order) → id náhradného cviku.
+   * Uložené pri tréningu, aby história vedela, čo sa naozaj cvičilo, a šablóna ostala nedotknutá.
+   */
+  swaps?: Record<number, string>
 }
 
 export interface SetLog {

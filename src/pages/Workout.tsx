@@ -7,11 +7,11 @@ import { useCountdown } from '../hooks/useCountdown'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { Banner, Button, Card, CardTitle, Pill } from '../components/ui'
 import { db } from '../db/db'
-import { deleteSet, discardWorkout, finishWorkout, logSet, type ProgressionResult } from '../db/actions'
+import { deleteSet, discardWorkout, finishWorkout, logSet, setSwap, type ProgressionResult } from '../db/actions'
 import { formatSk, todayISO } from '../domain/dates'
-import { getExercise } from '../domain/exercises'
+import { getExercise, type Exercise } from '../domain/exercises'
 import { describeSet } from '../domain/history'
-import { buildSession, TEMPLATE_NAMES, WARMUP } from '../domain/program'
+import { applySwaps, buildSession, swapCandidates, TEMPLATE_NAMES, WARMUP } from '../domain/program'
 import { nextHeavier, nextLighter, recommend } from '../domain/progression'
 import type { ExerciseState, Settings, SetLog } from '../domain/types'
 
@@ -25,6 +25,7 @@ export default function Workout({ settings }: { settings: Settings }) {
   const timer = useCountdown()
   const [results, setResults] = useState<ProgressionResult[] | null>(null)
   const [finishing, setFinishing] = useState(false)
+  const [swapping, setSwapping] = useState<number | null>(null)
 
   const workout = useLiveQuery(async () => (workoutId ? ((await db.workouts.get(workoutId)) ?? null) : null), [workoutId])
   const sets = useLiveQuery(async () => (workoutId ? db.sets.where('workoutId').equals(workoutId).toArray() : []), [workoutId])
@@ -42,7 +43,7 @@ export default function Workout({ settings }: { settings: Settings }) {
   if (!workoutId) return <Redirect />
   if (!workout || !sets || !states) return <div className="text-muted">Načítavam…</div>
 
-  const session = buildSession(workout.template, workout.minutes, workout.isDeload)
+  const session = applySwaps(buildSession(workout.template, workout.minutes, workout.isDeload), workout.swaps)
   const setsByExercise = new Map<string, SetLog[]>()
   for (const s of sets) setsByExercise.set(s.exerciseId, [...(setsByExercise.get(s.exerciseId) ?? []), s])
   const totalPlanned = session.reduce((n, it) => n + it.sets, 0)
@@ -155,11 +156,28 @@ export default function Workout({ settings }: { settings: Settings }) {
         if (!state) return null
         const rec = recommend(ex, state, workout.isDeload)
         const logged = (setsByExercise.get(ex.id) ?? []).sort((a, b) => a.setIndex - b.setIndex)
+        const original = item.originalExerciseId !== ex.id ? getExercise(item.originalExerciseId) : null
+        if (swapping === item.order) {
+          return (
+            <SwapPicker
+              key={`swap-${item.order}`}
+              current={ex}
+              original={original ?? ex}
+              candidates={swapCandidates(session, item.order)}
+              onPick={async (id) => {
+                await setSwap(workoutId, item.order, id === item.originalExerciseId ? null : id)
+                setSwapping(null)
+              }}
+              onCancel={() => setSwapping(null)}
+            />
+          )
+        }
         return (
           <ExerciseCard
             key={`${ex.id}-${item.order}`}
             exerciseName={ex.name}
-            label={item.label}
+            label={original ? `náhrada za: ${original.name}` : item.label}
+            onSwap={logged.length === 0 ? () => setSwapping(item.order) : undefined}
             rec={rec}
             sets={item.sets}
             logged={logged}
@@ -229,6 +247,49 @@ function labelFor(change: ProgressionResult['change']): string {
   }
 }
 
+/** Výber náhradného cviku – náhrada pri bolesti z knižnice je nápoveda, vybrať sa dá čokoľvek silové. */
+function SwapPicker({
+  current,
+  original,
+  candidates,
+  onPick,
+  onCancel,
+}: {
+  current: Exercise
+  original: Exercise
+  candidates: Exercise[]
+  onPick: (exerciseId: string) => Promise<void>
+  onCancel: () => void
+}) {
+  return (
+    <Card>
+      <CardTitle right={<Pill tone="warn">výmena</Pill>}>{current.name}</CardTitle>
+      <p className="text-xs text-muted">Náhrada pri bolesti podľa knižnice: {original.painSub}</p>
+      <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto">
+        {candidates.map((e) => (
+          <li key={e.id}>
+            <button
+              type="button"
+              onClick={() => void onPick(e.id)}
+              data-testid={`swap-${e.id}`}
+              className={`tap w-full rounded-xl border px-3 text-left ${e.id === current.id ? 'border-accent bg-accent/10' : 'border-line bg-surface2 active:bg-line'}`}
+            >
+              <span className="block text-sm font-semibold">
+                {e.name}
+                {e.id === original.id && e.id !== current.id ? ' (pôvodný)' : ''}
+              </span>
+              <span className="block text-xs text-muted">{e.muscles}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <Button variant="ghost" className="mt-3 w-full" onClick={onCancel}>
+        Zrušiť
+      </Button>
+    </Card>
+  )
+}
+
 interface LogValues {
   weightKg: number | null
   reps: number | null
@@ -293,9 +354,12 @@ function ExerciseCard({
   kettlebells,
   onLog,
   onDelete,
+  onSwap,
 }: {
   exerciseName: string
   label?: string
+  /** Výmena cviku – len kým nie je zapísaná séria. */
+  onSwap?: () => void
   rec: ReturnType<typeof recommend>
   sets: number
   logged: SetLog[]
@@ -324,7 +388,22 @@ function ExerciseCard({
 
   return (
     <Card>
-      <CardTitle right={<Pill tone={complete ? 'good' : 'muted'}>{doneCount}/{sets}</Pill>}>{exerciseName}</CardTitle>
+      <CardTitle
+        right={
+          <span className="flex items-center gap-2">
+            {onSwap ? (
+              <button type="button" onClick={onSwap} aria-label={`Vymeniť cvik ${exerciseName}`} data-testid="swap-open" className="rounded-full border border-line px-2 py-0.5 text-xs text-muted active:bg-line">
+                vymeniť
+              </button>
+            ) : null}
+            <Pill tone={complete ? 'good' : 'muted'}>
+              {doneCount}/{sets}
+            </Pill>
+          </span>
+        }
+      >
+        {exerciseName}
+      </CardTitle>
       <p className="text-lg font-semibold text-accent" data-testid={`rec-${exerciseName}`}>
         {rec.title}
       </p>

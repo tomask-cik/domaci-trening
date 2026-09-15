@@ -8,6 +8,7 @@ import {
   logSet,
   saveDay,
   saveSetup,
+  setSwap,
   startWorkout,
   syncDayKcal,
   addFood,
@@ -114,6 +115,16 @@ describe('tréning', () => {
     expect((await db.exerciseStates.get('goblet_squat'))?.targetReps).toBe(7)
     expect((await db.exerciseStates.get('kb_rdl'))?.targetReps).toBe(8) // bez sérií bez zmeny
     expect((await db.workouts.get(wid))?.finishedAt).toBeTruthy()
+  })
+  it('setSwap uloží výmenu na tréningu, null ju zruší', async () => {
+    const s = await freshSettings()
+    const wid = await startWorkout(s, 'B', TODAY)
+    await setSwap(wid, 3, 'kb_floor_press')
+    await setSwap(wid, 0, 'glute_bridge')
+    expect((await db.workouts.get(wid))?.swaps).toEqual({ 0: 'glute_bridge', 3: 'kb_floor_press' })
+    await setSwap(wid, 3, null)
+    expect((await db.workouts.get(wid))?.swaps).toEqual({ 0: 'glute_bridge' })
+    await setSwap(999, 0, 'kb_row') // neznámy tréning nič nespraví
   })
   it('v deload týždni finishWorkout stav nemení', async () => {
     const s = await freshSettings()

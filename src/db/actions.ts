@@ -172,6 +172,16 @@ export async function finishWorkout(workoutId: number, settings: Settings, today
   return results
 }
 
+/** Vymení cvik na pozícii `order` v tréningu; `null` vráti pôvodný. Len kým k pozícii nie sú zapísané série. */
+export async function setSwap(workoutId: number, order: number, exerciseId: string | null): Promise<void> {
+  const w = await db.workouts.get(workoutId)
+  if (!w) return
+  const swaps = { ...(w.swaps ?? {}) }
+  if (exerciseId === null) delete swaps[order]
+  else swaps[order] = exerciseId
+  await db.workouts.update(workoutId, { swaps })
+}
+
 export async function discardWorkout(workoutId: number): Promise<void> {
   await db.transaction('rw', db.workouts, db.sets, async () => {
     await db.sets.where('workoutId').equals(workoutId).delete()
