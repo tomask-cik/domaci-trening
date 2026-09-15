@@ -6,15 +6,16 @@ import { db } from '../db/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addDays, todayISO, weekIndex, weekStart } from '../domain/dates'
 import { getExercise, KEY_EXERCISE_IDS } from '../domain/exercises'
-import { estimated1RM } from '../domain/progression'
+import { setScore } from '../domain/history'
 import { stepGoalForWeek, weeklySteps } from '../domain/steps'
 import type { Settings, SetLog } from '../domain/types'
-import { movingAverage, phaseBoundaries, PHASE_NAMES, phaseFor, trendSeries } from '../domain/weight'
+import { currentWeightKg, movingAverage, phaseBoundaries, PHASE_NAMES, phaseFor, trendSeries, weightPoints } from '../domain/weight'
 import { useDay, useDays } from '../hooks/useAppData'
 import { kg, num, steps as fmtSteps } from '../lib/format'
 
 const AXIS = { stroke: '#93a3c4', fontSize: 11 }
 const GRID = '#2b3a5c'
+const TOOLTIP = { background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }
 
 export default function Body({ settings }: { settings: Settings }) {
   const today = todayISO()
@@ -23,16 +24,13 @@ export default function Body({ settings }: { settings: Settings }) {
   const sets = useLiveQuery(() => db.sets.toArray(), [])
   const [strengthId, setStrengthId] = useState<string>('goblet_squat')
 
-  const points = useMemo(
-    () => (days ?? []).filter((d): d is typeof d & { weightKg: number } => typeof d.weightKg === 'number').map((d) => ({ date: d.date, weightKg: d.weightKg })),
-    [days],
-  )
+  const points = useMemo(() => weightPoints(days ?? []), [days])
 
   if (!days || day === undefined || !sets) return <div className="text-muted">Načítavam…</div>
 
   const series = trendSeries(points).map((p) => ({ ...p, label: p.date.slice(5).replace('-', '.') }))
   const avg = movingAverage(points, today)
-  const current = avg ?? points[points.length - 1]?.weightKg ?? settings.startWeightKg
+  const current = currentWeightKg(days, today, settings.startWeightKg)
   const phase = phaseFor(current, settings.startWeightKg, settings.targetWeightKg)
   const [b1, b2] = phaseBoundaries(settings.startWeightKg, settings.targetWeightKg)
   const lost = Math.round((settings.startWeightKg - current) * 10) / 10
@@ -48,11 +46,8 @@ export default function Body({ settings }: { settings: Settings }) {
 
   const strengthEx = getExercise(strengthId)
   const strengthSets = sets.filter((s: SetLog) => s.exerciseId === strengthId)
-  const strengthSeries = buildStrengthSeries(strengthSets, strengthEx.kind)
-  const pullupSeries = buildStrengthSeries(
-    sets.filter((s: SetLog) => s.exerciseId === 'pullup_prog'),
-    'stage',
-  )
+  const strengthSeries = buildStrengthSeries(strengthSets)
+  const pullupSeries = buildStrengthSeries(sets.filter((s: SetLog) => s.exerciseId === 'pullup_prog'))
 
   return (
     <div className="space-y-4">
@@ -86,10 +81,7 @@ export default function Body({ settings }: { settings: Settings }) {
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={AXIS} minTickGap={24} />
                 <YAxis tick={AXIS} domain={['dataMin - 1', 'dataMax + 1']} />
-                <Tooltip
-                  contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }}
-                  formatter={(v: unknown, name: unknown) => [`${num(Number(v), 1)} kg`, name === 'kg' ? 'denne' : '7-dňový priemer'] as [string, string]}
-                />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown, name: unknown) => [`${num(Number(v), 1)} kg`, name === 'kg' ? 'denne' : '7-dňový priemer'] as [string, string]} />
                 <ReferenceLine y={settings.targetWeightKg} stroke="#34d399" strokeDasharray="4 4" />
                 <Line type="monotone" dataKey="kg" stroke="#93a3c4" dot={false} strokeWidth={1} />
                 <Line type="monotone" dataKey="avg" stroke="#38bdf8" dot={false} strokeWidth={2.5} connectNulls />
@@ -108,7 +100,7 @@ export default function Body({ settings }: { settings: Settings }) {
               <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
               <XAxis dataKey="label" tick={AXIS} />
               <YAxis tick={AXIS} />
-              <Tooltip contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }} formatter={(v: unknown) => [fmtSteps(Number(v)), 'priemer/deň'] as [string, string]} />
+              <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown) => [fmtSteps(Number(v)), 'priemer/deň'] as [string, string]} />
               <ReferenceLine y={stepGoal} stroke="#34d399" strokeDasharray="4 4" />
               <Bar dataKey="priemer" fill="#38bdf8" radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -140,10 +132,7 @@ export default function Body({ settings }: { settings: Settings }) {
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={AXIS} minTickGap={20} />
                 <YAxis tick={AXIS} />
-                <Tooltip
-                  contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }}
-                  formatter={(v: unknown) => [num(Number(v), 1), strengthEx.kind === 'load' ? 'odhad 1RM (kg)' : 'najlepšia séria'] as [string, string]}
-                />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown) => [num(Number(v), 1), strengthEx.kind === 'load' ? 'odhad 1RM (kg)' : 'najlepšia séria'] as [string, string]} />
                 <Line type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -165,7 +154,7 @@ export default function Body({ settings }: { settings: Settings }) {
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={AXIS} minTickGap={20} />
                 <YAxis tick={AXIS} />
-                <Tooltip contentStyle={{ background: '#131c31', border: '1px solid #2b3a5c', borderRadius: 12, color: '#e8eefc' }} formatter={(v: unknown) => [num(Number(v), 0), 'najlepšia séria'] as [string, string]} />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v: unknown) => [num(Number(v), 0), 'najlepšia séria'] as [string, string]} />
                 <Line type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2.5} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -179,15 +168,11 @@ export default function Body({ settings }: { settings: Settings }) {
   )
 }
 
-function buildStrengthSeries(sets: SetLog[], kind: 'load' | 'stage' | 'timed'): { label: string; value: number }[] {
+/** Najlepšia séria každého dňa – rovnaké skóre ako v Histórii (odhad 1RM / sekundy / opakovania). */
+function buildStrengthSeries(sets: SetLog[]): { label: string; value: number }[] {
   const byDate = new Map<string, number>()
   for (const s of sets) {
-    const value =
-      kind === 'load' && s.weightKg !== null && s.reps !== null
-        ? estimated1RM(s.weightKg, s.reps)
-        : s.seconds !== null
-          ? s.seconds
-          : (s.reps ?? 0)
+    const value = setScore(s.exerciseId, s)
     const cur = byDate.get(s.date) ?? 0
     if (value > cur) byDate.set(s.date, value)
   }

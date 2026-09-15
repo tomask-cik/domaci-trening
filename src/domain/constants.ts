@@ -68,6 +68,9 @@ export const STEPS_INCREMENT_PER_WEEK = 500
 // --- Sedenie (PROGRAM.md 3, RESEARCH R7) ---
 export const BREAK_INTERVAL_MIN = 40
 
+// --- Vybavenie ---
+export const KB_OPTIONS = [8, 10, 12, 16, 20, 24, 28, 32] // bežné hmotnosti kettlebellov na výber
+
 // --- Predvolené hodnoty úvodného nastavenia (DECISIONS A1–A5) ---
 export const DEFAULTS = {
   age: 35,

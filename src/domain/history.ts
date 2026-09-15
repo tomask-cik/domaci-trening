@@ -10,6 +10,7 @@
  *  - štádiá v opakovaniach (zhyby, dipy): opakovania
  */
 
+import { addDays } from './dates'
 import { EXERCISE_MAP } from './exercises'
 import { estimated1RM } from './progression'
 import type { SetLog, TemplateId, Workout } from './types'
@@ -193,8 +194,6 @@ export function personalBests(sets: SetLog[]): BestEntry[] {
 
 /** Koľko rekordov padlo za posledných `days` dní – malé povzbudenie na Dnes. */
 export function recentPrCount(history: WorkoutSummary[], today: string, days = 28): number {
-  const from = new Date(today)
-  from.setDate(from.getDate() - days)
-  const fromISO = from.toISOString().slice(0, 10)
+  const fromISO = addDays(today, -days)
   return history.filter((w) => w.date >= fromISO).reduce((n, w) => n + w.prs.length, 0)
 }

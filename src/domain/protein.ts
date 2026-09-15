@@ -49,3 +49,8 @@ export function proteinTarget(input: ProteinInput): ProteinResult {
   const gramsPerDay = round5(clamped)
   return { gramsPerDay, perMeal: Math.round(gramsPerDay / PROTEIN_MEALS), basis }
 }
+
+/** Cieľ bielkovín z nastavení – referenčná hmotnosť je štartovacia (pri nej sa meral tuk). */
+export function proteinFor(s: { targetWeightKg: number; startWeightKg: number; bodyFatPct: number | null }): ProteinResult {
+  return proteinTarget({ targetWeightKg: s.targetWeightKg, referenceWeightKg: s.startWeightKg, bodyFatPct: s.bodyFatPct })
+}

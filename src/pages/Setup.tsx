@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { saveSetup } from '../db/actions'
 import { initialCalorieTarget, mifflinStJeor } from '../domain/calories'
-import { DEFAULTS, STEPS_START } from '../domain/constants'
+import { DEFAULTS, KB_OPTIONS, STEPS_START } from '../domain/constants'
 import { proteinTarget } from '../domain/protein'
 import { Banner, Button, Card, CardTitle, NumberField } from '../components/ui'
 import { kcal } from '../lib/format'
-
-const KB_OPTIONS = [8, 10, 12, 16, 20, 24, 28, 32]
 
 export default function Setup() {
   const [age, setAge] = useState<number | null>(DEFAULTS.age)

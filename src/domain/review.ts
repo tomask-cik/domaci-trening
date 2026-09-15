@@ -3,11 +3,9 @@ import { MIN_DAYS_BEFORE_ADAPT, MIN_WEIGHINS_PER_WEEK, SLEEP_KCAL_BONUS, SLEEP_S
 import { addDays, diffDays, weekStart } from './dates'
 import { isDeloadWeek } from './deload'
 import type { DayLog, Settings, WeekReview } from './types'
-import { weeklyRate, type WeightPoint } from './weight'
+import { weeklyRate, weightPoints } from './weight'
 
-export function weightPoints(days: DayLog[]): WeightPoint[] {
-  return days.filter((d): d is DayLog & { weightKg: number } => typeof d.weightKg === 'number').map((d) => ({ date: d.date, weightKg: d.weightKg }))
-}
+export { weightPoints }
 
 /** Týždne (pondelky), ktoré sú už celé za nami a ešte nemajú vyhodnotenie. */
 export function pendingReviewWeeks(settings: Settings, existing: WeekReview[], today: string): string[] {

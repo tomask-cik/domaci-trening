@@ -132,3 +132,13 @@ describe('osobné rekordy', () => {
     expect(recentPrCount(h, '2026-09-14', 365)).toBe(2)
   })
 })
+
+describe('recentPrCount cez hranicu mesiaca', () => {
+  it('okno 28 dní sa počíta v lokálnych dátumoch, nie cez UTC', () => {
+    const w = [workout(1, '2026-09-03'), workout(2, '2026-09-04')]
+    const s = [set(1, '2026-09-03', 'goblet_squat', { weightKg: 16, reps: 8 }), set(2, '2026-09-04', 'goblet_squat', { weightKg: 16, reps: 9 })]
+    const h = buildHistory(w, s)
+    expect(recentPrCount(h, '2026-10-02', 28)).toBe(1) // 2026-09-04 je presne 28 dní pred 2026-10-02
+    expect(recentPrCount(h, '2026-10-03', 28)).toBe(0)
+  })
+})

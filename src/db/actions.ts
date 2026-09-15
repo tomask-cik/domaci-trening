@@ -1,5 +1,5 @@
 import { initialCalorieTarget, mifflinStJeor } from '../domain/calories'
-import { STEPS_GOAL, STEPS_START } from '../domain/constants'
+import { ACTIVITY_FACTOR, DELOAD_EVERY_WEEKS, STEPS_GOAL, STEPS_START } from '../domain/constants'
 import { todayISO, weekStart } from '../domain/dates'
 import { startManualDeload } from '../domain/deload'
 import { EXERCISES, getExercise } from '../domain/exercises'
@@ -45,11 +45,11 @@ export async function saveSetup(input: SetupInput, today = todayISO()): Promise<
     minutesPerSession: input.minutesPerSession,
     stepsStart: input.stepsStart || STEPS_START,
     stepsGoal: STEPS_GOAL,
-    activityFactor: DEFAULTS_ACTIVITY,
+    activityFactor: ACTIVITY_FACTOR,
     calorieTarget: initialCalorieTarget(bmr),
     programStartDate: today,
     cycleStartDate: weekStart(today),
-    deloadEveryWeeks: DEFAULTS_DELOAD,
+    deloadEveryWeeks: DELOAD_EVERY_WEEKS,
     manualDeloadWeeks: [],
     breakReminders: true,
   }
@@ -58,9 +58,6 @@ export async function saveSetup(input: SetupInput, today = todayISO()): Promise<
   await db.days.put({ date: today, weightKg: input.startWeightKg })
   return settings
 }
-
-const DEFAULTS_ACTIVITY = 1.4
-const DEFAULTS_DELOAD = 7
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   const cur = await db.settings.get(1)

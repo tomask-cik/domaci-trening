@@ -3,11 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Card, CardTitle, Pill, Stat } from '../components/ui'
 import { db } from '../db/db'
 import { buildHistory, personalBests, recentPrCount, type WorkoutSummary } from '../domain/history'
-import { addDays, dayOfWeekSk, formatSk, todayISO, weekStart } from '../domain/dates'
+import { addDays, dayOfWeekSk, formatSk, todayISO } from '../domain/dates'
 import { TEMPLATE_NAMES } from '../domain/program'
 import { num } from '../lib/format'
 import { buildWeekContext, WEEK_SYSTEM } from '../domain/summary'
-import { proteinTarget } from '../domain/protein'
+import { proteinFor } from '../domain/protein'
 import { AiSummary } from '../components/AiSummary'
 import type { DayLog, FoodEntry, RunLog, Settings, SetLog, Workout } from '../domain/types'
 
@@ -81,20 +81,13 @@ export default function History({ settings }: { settings: Settings }) {
         apiKey={settings.anthropicApiKey}
         hint="Posiela súhrnné čísla za posledných 7 dní, nie celú históriu."
         context={buildWeekContext(
-          addDays(weekStart(today), 0),
-          addDays(weekStart(today), 6),
+          addDays(today, -6),
+          today,
           days as DayLog[],
           foods as FoodEntry[],
           workouts as Workout[],
-          {
-            kcal: settings.calorieTarget,
-            proteinG: proteinTarget({
-              targetWeightKg: settings.targetWeightKg,
-              referenceWeightKg: settings.startWeightKg,
-              bodyFatPct: settings.bodyFatPct,
-            }).gramsPerDay,
-          },
-          history.filter((w) => w.date >= weekStart(today)).reduce((n, w) => n + w.prs.length, 0),
+          { kcal: settings.calorieTarget, proteinG: proteinFor(settings).gramsPerDay },
+          recentPrCount(history, today, 6),
           runs as RunLog[],
         )}
       />

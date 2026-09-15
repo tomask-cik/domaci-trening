@@ -37,51 +37,9 @@ export function hasApiKey(key: string | undefined | null): key is string {
 
 export async function lookupFood(apiKey: string, query: string, signal?: AbortSignal): Promise<LookupResult> {
   if (!query.trim()) return { ok: false, error: 'Zadaj názov jedla.' }
-
-  let res: Response
-  try {
-    res = await fetch(ENDPOINT, {
-      method: 'POST',
-      signal: signal ?? null,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 300,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: query.trim() }],
-      }),
-    })
-  } catch {
-    return { ok: false, error: 'Nepodarilo sa spojiť s API. Skontroluj internet.' }
-  }
-
-  if (!res.ok) {
-    if (res.status === 401) return { ok: false, error: 'Neplatný API kľúč. Skontroluj ho v nastaveniach.' }
-    if (res.status === 429) return { ok: false, error: 'Priveľa požiadaviek naraz. Skús o chvíľu.' }
-    if (res.status === 400) return { ok: false, error: 'API odmietlo požiadavku (400).' }
-    return { ok: false, error: `API vrátilo chybu ${res.status}.` }
-  }
-
-  let data: unknown
-  try {
-    data = await res.json()
-  } catch {
-    return { ok: false, error: 'Odpoveď API sa nedá prečítať.' }
-  }
-
-  const blocks = (data as { content?: { type?: string; text?: string }[] }).content ?? []
-  const text = blocks
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text ?? '')
-    .join('\n')
-  if (!text.trim()) return { ok: false, error: 'API vrátilo prázdnu odpoveď.' }
-
-  const parsed = parseNutrition(text)
+  const r = await callClaude(apiKey, { model: MODEL, system: SYSTEM, user: query.trim(), maxTokens: 300, signal })
+  if (!r.ok) return { ok: false, error: r.error }
+  const parsed = parseNutrition(r.text)
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error }
 }
 
@@ -118,6 +76,7 @@ async function callClaude(apiKey: string, o: CallOpts): Promise<{ ok: true; text
   if (!res.ok) {
     if (res.status === 401) return { ok: false, error: 'Neplatný API kľúč. Skontroluj ho v nastaveniach.' }
     if (res.status === 429) return { ok: false, error: 'Priveľa požiadaviek naraz. Skús o chvíľu.' }
+    if (res.status === 400 || res.status === 404) return { ok: false, error: `API odmietlo požiadavku (${res.status}) – skontroluj model ${o.model}.` }
     return { ok: false, error: `API vrátilo chybu ${res.status}.` }
   }
   let data: unknown

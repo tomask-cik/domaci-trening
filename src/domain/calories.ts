@@ -104,3 +104,25 @@ export function adaptCalorieTarget(input: AdaptInput): AdaptResult {
   }
   return { newTarget, delta: newTarget - currentTarget, reason: reason.trim() }
 }
+
+export interface DailyTarget {
+  /** Čo má dnes jesť. */
+  kcal: number
+  /** Odhad výdaja pri aktuálnej hmotnosti (udržiavacia úroveň). */
+  maintenanceKcal: number
+  /** true = deload, je sa na udržiavacej úrovni (PROGRAM.md 5). */
+  isMaintenance: boolean
+}
+
+/**
+ * Denný kalorický cieľ na zobrazenie: v deloade udržiavacia úroveň z aktuálnej hmotnosti,
+ * inak adaptívny cieľ z nastavení. Rovnaké číslo musí vidieť Dnes aj denník jedla.
+ */
+export function dailyCalorieTarget(
+  s: { sex: Sex; heightCm: number; age: number; activityFactor: number; calorieTarget: number },
+  currentKg: number,
+  isDeload: boolean,
+): DailyTarget {
+  const maintenanceKcal = tdeeEstimate(mifflinStJeor(s.sex, currentKg, s.heightCm, s.age), s.activityFactor)
+  return { kcal: isDeload ? maintenanceKcal : s.calorieTarget, maintenanceKcal, isMaintenance: isDeload }
+}
